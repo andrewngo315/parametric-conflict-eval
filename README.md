@@ -1,4 +1,4 @@
-# My First Harness
+# Basic Evaluation Harness
 
 ## What it does
 
