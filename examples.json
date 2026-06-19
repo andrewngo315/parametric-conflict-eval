@@ -3,5 +3,5 @@
     {"answer": "no", "gold": "yes"},
     {"answer": "yes", "gold": "no"},
     {"answer": "yes", "gold": "yes"},
-    {"answer": "no", "gold": "no"}
+    {"answer": "no", "gold": "no"}  
 ]
