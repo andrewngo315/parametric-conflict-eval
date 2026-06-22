@@ -39,4 +39,13 @@ score = score_examples(examples)
 print("Score:", round(score, 2))
 precision_recall(examples)
 
+# Confidence Intervals
+total = len(examples)
+se = (score * (1 - score) / total) ** 0.5
+low = score - 1.96 * se
+high = score + 1.96 * se
+print("95% CI:", round(low, 2), "to", round(high, 2))
+
+
+
 
