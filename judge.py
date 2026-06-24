@@ -1,4 +1,4 @@
-# judge.py is a test for judge models to see if they are fit to stand as LLM judge on first_call.py
+# judge.py is a test for judge models to see if they are fit to stand as LLM judge on harness.py
 import anthropic
 from openai import OpenAI
 import json
@@ -6,19 +6,34 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = anthropic.Anthropic()   
-oai    = OpenAI()                 
 
-GRADEE_MODEL = "claude-haiku-4-5"  # the model under test (mirrors first_call.py)
+# Ensures API keys are only called when needed and saved after first use
+_anthropic = None
+_openai = None
+def gradee_client():
+    global _anthropic
+    if _anthropic is None:
+        _anthropic = anthropic.Anthropic()
+    return _anthropic
+def judge_client():
+    global _openai
+    if _openai is None:
+        _openai = OpenAI()
+    return _openai
+
+GRADEE_MODEL = "claude-haiku-4-5"  # the model under test (mirrors harness.py)
 JUDGE_MODEL  = "gpt-5.4-mini"      # LLM judge, ideally from a different model provider to GRADEE_MODEL
                                    
-GOLD_FILE = "judge_gold.json"
-passage = open("document.txt").read() 
+GOLD_FILE = "judge_gold.json"        # ground truth 
+RESULTS_FILE = "judge_results.json"  # the judge's verdicts and justifications. regenerated every run
+passage = open("document.txt").read()
 
-FIRM = ("Answer using ONLY the passage. If the passage does not contain the answer, "
-        "reply exactly: NOT IN DOCUMENT. Never use outside knowledge.")
+STRICT = (  # the strict instruction; harness.py imports this and uses it as STRONG (defined once here)
+    "Answer using ONLY the passage. If the passage does not contain the answer, "
+    "reply exactly: NOT IN DOCUMENT. Never use outside knowledge."
+)
 SOFT = "Base your answer on the passage provided."
-TASKS = [("FIRM", FIRM), ("SOFT", SOFT)]
+TASKS = [("FIRM", STRICT), ("SOFT", SOFT)]
 
 PROBES = [
     {"question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
@@ -34,7 +49,7 @@ PROBES = [
 ]
 
 def ask(system_instruction, question, doc, model=GRADEE_MODEL):
-    response = client.messages.create(
+    response = gradee_client().messages.create(
         model=model,
         max_tokens=400,
         system=system_instruction,
@@ -75,7 +90,7 @@ def build_judge_prompt(question, doc, answer):
 
 # Calling the judge
 def judge(question, doc, answer):
-    response = oai.responses.create(
+    response = judge_client().responses.create(
         model=JUDGE_MODEL,
         instructions=JUDGE_SYSTEM,             
         input=build_judge_prompt(question, doc, answer),
@@ -118,13 +133,16 @@ def build_gold(reps=2):
                 answer = ask(instruction, probe["question"], passage)
                 rows.append({**probe, "firmness": firmness, "answer": answer, "human": None}) 
     with open(GOLD_FILE, "w") as f:
-        json.dump(rows, f, indent=2) # write answers to judge_gold.json
+        json.dump(rows, f, indent=2) # writes to judge_gold.json
     return rows
 
 # Judge scores gradee answers then gets judged based on quality of judgment
 def validate_judge():
     with open(GOLD_FILE) as f:
         rows = json.load(f)
+    bad = [r["human"] for r in rows if r["human"] not in (FAITHFUL, LEAK)] # spell check
+    if bad:
+        raise ValueError(f'every "human" label must be exactly "{FAITHFUL}" or "{LEAK}"; found invalid: {bad}')
     human, machine = [], [] # sets up two empty lists to collect human and machine labels
     for row in rows:
         faithful, reason = judge(row["question"], passage, row["answer"])
@@ -142,7 +160,10 @@ def validate_judge():
     for r in disagreements: # analyse whether disagreement is fault of model or inaccurate gold labels
         oneline = " ".join(r["answer"].split())
         print(f"    [{r['firmness']}/{r['role']}] human={r['human']} judge={FAITHFUL if r['judge'] else LEAK} -- {r['judge_reason']}")
-        print(f"        answer: {oneline[:160]}") 
+        print(f"        answer: {oneline[:160]}")
+    with open(RESULTS_FILE, "w") as f: # persist the judge's verdicts + reasons (rows now carry judge/judge_reason)
+        json.dump(rows, f, indent=2)
+    print(f"  saved judge verdicts + reasons to {RESULTS_FILE}")
 
 # Assesses where users are at in successful test execution
 if __name__ == "__main__": 
