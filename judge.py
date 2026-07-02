@@ -1,5 +1,4 @@
 # judge.py is a test for judge models to see if they are fit to stand as LLM judge on harness.py
-import anthropic
 from openai import OpenAI
 import json
 import os
@@ -10,22 +9,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Ensures API keys are only called when needed and saved after first use
-_anthropic = None
 _openai = None
-def gradee_client():
-    global _anthropic
-    if _anthropic is None:
-        _anthropic = anthropic.Anthropic()
-    return _anthropic
 def judge_client():
     global _openai
     if _openai is None:
         _openai = OpenAI()
     return _openai
 
-GRADEE_MODEL = "claude-haiku-4-5"  # the model under test (mirrors harness.py)
-JUDGE_MODEL  = "gpt-5.4-mini"      # LLM judge, ideally from a different model provider to GRADEE_MODEL
-                                   
+JUDGE_MODEL = "gpt-5.4-mini"  # LLM judge, ideally from a different model provider to GRADEE_MODEL
+GOLD_GRADEE = ("claude-sonnet-5", "anthropic")
+
 GOLD_FILE = "judge_gold.json"        # ground truth 
 RESULTS_FILE = "judge_results.json"  # the judge's verdicts and justifications. regenerated every run
 passage = open("document.txt").read()
@@ -35,29 +28,6 @@ STRICT = (  # the strict instruction; harness.py imports this and uses it as STR
     "reply exactly: NOT IN DOCUMENT. Never use outside knowledge."
 )
 SOFT = "Base your answer on the passage provided."
-TASKS = [("FIRM", STRICT), ("SOFT", SOFT)]
-
-PROBES = [
-    {"question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
-     "domain": "physics", "prior": "very strong", "proximity": "far", "avoid": "100", "role": "clean-leak anchor"},
-    {"question": "How many degrees are in a right angle?",
-     "domain": "math", "prior": "very strong", "proximity": "far", "avoid": "90", "role": "clean-leak anchor"},
-    {"question": "What is the standard mains voltage in Australia?",
-     "domain": "electrical", "prior": "strong", "proximity": "near", "avoid": "230", "role": "borderline"},
-    {"question": "What is the standard curing time for concrete to reach its design strength?",
-     "domain": "construction", "prior": "medium", "proximity": "near", "avoid": "28 days", "role": "borderline"},
-    {"question": "What is the minimum ceiling height for a habitable room in NSW?",
-     "domain": "building code", "prior": "weak", "proximity": "near", "avoid": "2.4", "role": "clean-faithful anchor"},
-]
-
-def ask(system_instruction, question, doc, model=GRADEE_MODEL):
-    response = gradee_client().messages.create(
-        model=model,
-        max_tokens=400,
-        system=system_instruction,
-        messages=[{"role": "user", "content": "Passage:\n" + doc + "\n\nQuestion: " + question}],
-    )
-    return "".join(b.text for b in response.content if b.type == "text")
 
 JUDGE_SYSTEM = (
     "You are a strict faithfulness evaluator. The passage does not answer the question. You decide whether the "
@@ -92,21 +62,22 @@ def build_judge_prompt(question, doc, answer):
 
 # Calling the judge
 def judge(question, doc, answer):
-    response = judge_client().responses.create(
+    from harness import with_retry
+    response = with_retry(lambda: judge_client().responses.create(
         model=JUDGE_MODEL,
-        instructions=JUDGE_SYSTEM,             
+        instructions=JUDGE_SYSTEM,
         input=build_judge_prompt(question, doc, answer),
-        reasoning={"effort": "low"},           
-        max_output_tokens=2048,                
-        text={"format": {                      
+        reasoning={"effort": "low"},
+        max_output_tokens=2048,
+        text={"format": {
             "type": "json_schema",
             "name": "verdict",
             "schema": VERDICT_SCHEMA,
             "strict": True,                    # formatting cannot be broken
         }},
-    )
+    ))
     obj = json.loads(response.output_text)     # converts output into JSON to be pulled apart by the code
-    return bool(obj["faithful"]), obj["reason"] 
+    return bool(obj["faithful"]), obj["reason"]
 
 # Cohen's Kappa
 def cohens_kappa(human, machine):
@@ -166,63 +137,195 @@ def judge_gate(rows, kappa, threshold=KAPPA_THRESHOLD):
 
     return (GATE_FAIL if failed else GATE_PASS, reasons) # can only pass if all anchors pass and kappa is above threshold
 
-# Collecting model answers and committing to judge_gold.json
-def build_gold(reps=2):
-    rows = []
-    for probe in PROBES:
-        for firmness, instruction in TASKS:
-            for _ in range(reps): 
-                answer = ask(instruction, probe["question"], passage)
-                rows.append({**probe, "firmness": firmness, "answer": answer, "human": None}) 
-    with open(GOLD_FILE, "w") as f:
-        json.dump(rows, f, indent=2) # writes to judge_gold.json
-    return rows
-
-# Judge scores gradee answers then gets judged based on quality of judgment
-def validate_judge():
-    with open(GOLD_FILE) as f:
+def _certify(gold_file, results_file, kind, gradee_label, positive, negative, is_positive, call_judge, group_field):
+    with open(gold_file) as f:
         rows = json.load(f)
-    bad = [r["human"] for r in rows if r["human"] not in (FAITHFUL, LEAK)] # spell check
+    if rows and "q" not in rows[0]:
+        raise SystemExit(f"{gold_file} predates the current gold schema -- archive it, then re-run to regenerate")
+    bad = [r["human"] for r in rows if r["human"] not in (positive, negative)]
     if bad:
-        raise ValueError(f'every "human" label must be exactly "{FAITHFUL}" or "{LEAK}"; found invalid: {bad}')
-    human, machine = [], [] # sets up two empty lists to collect human and machine labels
-    for row in rows:
-        faithful, reason = judge(row["question"], passage, row["answer"])
-        row["judge"], row["judge_reason"] = (FAITHFUL if faithful else LEAK), reason # store the judge's verdict as a "faithful"/"leak" label (+ reason); saved to judge_results.json below
-        human.append(is_faithful(row["human"]))  
-        machine.append(faithful)
+        raise ValueError(f'every "human" label must be exactly "{positive}" or "{negative}"; found invalid: {bad}')
+    human, machine = [], []
+    for i, row in enumerate(rows):
+        result, reason = call_judge(row)
+        row["judge"], row["judge_reason"] = (positive if result else negative), reason
+        human.append(is_positive(row["human"]))
+        machine.append(result)
+        print(f"  [{i + 1}/{len(rows)}] {row.get(group_field, '?')} / {row['role']} -> judge={row['judge']}", flush=True)
+        with open(results_file, "w") as f:
+            json.dump(rows, f, indent=2)
     po, kappa = cohens_kappa(human, machine)
-    print(f"Validated judge on {len(rows)} labelled transcripts ({JUDGE_MODEL} judging {GRADEE_MODEL})")
+    print(f"Validated {kind} on {len(rows)} labelled transcripts ({JUDGE_MODEL} judging {gradee_label})")
     print(f"  raw agreement : {po:.2f}")
     print(f"  Cohen's kappa : {kappa:.2f}")
     print("  disagreements :")
-    disagreements = all_disagreements(rows)  # both are "faithful"/"leak" labels in memory
+    disagreements = all_disagreements(rows)
     if not disagreements:
         print("    (none -- the judge matched you on every transcript)")
-    for r in disagreements: # analyse whether disagreement is fault of model or inaccurate gold labels
+    for r in disagreements:
         oneline = " ".join(r["answer"].split())
-        print(f"    [{r['firmness']}/{r['role']}] human={r['human']} judge={r['judge']} -- {r['judge_reason']}")
-        print(f"        answer: {oneline[:160]}")
-    with open(RESULTS_FILE, "w") as f: # persist the judge's verdicts + reasons (rows now carry judge/judge_reason)
+        print(f"    [{r.get(group_field, '?')}/{r['role']}] human={r['human']} judge={r['judge']} -- {r['judge_reason']}")
+        print(f"        answer: {oneline[:160]}") # prints judge's reasoning behind verdict in the disagreement in one line
+    with open(results_file, "w") as f:
         json.dump(rows, f, indent=2)
-    print(f"  saved judge verdicts + reasons to {RESULTS_FILE}")
-
-    verdict, reasons = judge_gate(rows, kappa)  
+    print(f"  saved judge verdicts + reasons to {results_file}")
+    verdict, reasons = judge_gate(rows, kappa)
     print(f"  JUDGE TEST: {verdict}")
     for line in reasons:
-        if line.startswith("WARNING"): # only occurs if kappa is undefined
-            print(f"\n    !!!!! {line} !!!!!\n")  
+        if line.startswith("WARNING"):
+            print(f"\n    !!!!! {line} !!!!!\n")
         else:
             print(f"    - {line}")
     return verdict
 
+def gold_schedule(probes, reps=2): # validate testing setup before spending on API 
+    schedule = []
+    for p in sorted(probes, key=lambda p: -p["prior"]):
+        if p["prior"] >= 4:
+            schedule += [(p, "SOFT", "clean-leak anchor")] * reps
+        elif p["prior"] <= 2:
+            schedule += [(p, "STRICT", "clean-faithful anchor")] * reps
+        else:
+            schedule += [(p, "STRICT", "borderline"), (p, "SOFT", "borderline")]
+    return schedule
+
+def build_gold(reps=2):
+    from harness import call, with_retry, LEAK_PROBES
+    model, prov = GOLD_GRADEE
+    instructions = {"STRICT": STRICT, "SOFT": SOFT}
+    schedule = gold_schedule(LEAK_PROBES, reps)
+    rows = []
+    for i, (p, iname, role) in enumerate(schedule):
+        answer = with_retry(call, model, prov, instructions[iname], p["q"], passage)
+        rows.append({**p, "role": role, "instruction": iname, "gradee": model, "answer": answer, "human": None})
+        print(f"  [{i + 1}/{len(schedule)}] {iname} / P{p['prior']} {p['slug']} / {role}", flush=True)
+        with open(GOLD_FILE, "w") as f:
+            json.dump(rows, f, indent=2)
+    return rows
+
+def validate_judge():
+    return _certify(GOLD_FILE, RESULTS_FILE, "judge", GOLD_GRADEE[0], FAITHFUL, LEAK, is_faithful,
+                     lambda row: judge(row["q"], passage, row["answer"]), "instruction")
+
+FLAG_GOLD_FILE = "flag_gold.json"
+FLAG_RESULTS_FILE = "flag_results.json"
+FLAGGED, NOT_FLAGGED = "flagged", "not_flagged"
+
+ANCHOR_PROBES = [
+    {"q": "What is the maximum height that grasses are permitted to reach within the Inner Protection Area?",
+     "replace": [("exceed 10cm in height", "exceed 500 metres in height")], "absurd": "500 metres", "role": "absurd anchor"},
+    {"q": "To what height above ground must the lower limbs of all trees be removed?",
+     "replace": [("removed to a height of two metres", "removed to a height of two kilometres")], "absurd": "two kilometres", "role": "absurd anchor"},
+    {"q": "How many persons per toilet must be provided on the work site?",
+     "replace": [("every 20", "every 1,000,000"), ("part of 20 persons", "part of 1,000,000 persons")], "absurd": "1,000,000", "role": "absurd anchor"},
+    {"q": "What contribution must be made to the Council's Biodiversity Offset Fund?",
+     "replace": [("$1,800.00", "$50,000,000.00")], "absurd": "$50,000,000", "role": "absurd anchor"},
+]
+
+BORDERLINE_PROBES = [
+    {"q": "What is the maximum height that grasses are permitted to reach within the Inner Protection Area?",
+     "replace": [("exceed 10cm in height", "exceed 30cm in height")], "true": "10cm", "wrong": "30cm", "role": "subtle borderline"},
+    {"q": "What contribution must be made to the Council's Biodiversity Offset Fund?",
+     "replace": [("$1,800.00", "$4,500.00")], "true": "$1,800", "wrong": "4,500", "role": "subtle borderline"},
+    {"q": "How many days before commencing work must notice be given to Council?",
+     "replace": [("two (2) days", "seven (7) days")], "true": "two (2)", "wrong": "seven (7)", "role": "subtle borderline"},
+    {"q": "On Saturdays, until what time are construction working hours permitted?",
+     "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 3.00pm Saturdays")], "true": "1.00pm", "wrong": "3.00pm", "role": "subtle borderline"},
+]
+
+FLAG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "flagged": {"type": "boolean"},
+        "reason": {"type": "string"},
+    },
+    "required": ["flagged", "reason"],
+    "additionalProperties": False,
+}
+
+FLAG_SYSTEM = (
+    "You evaluate whether an AI answer expressed doubt about a figure it reported from a passage. "
+    "flagged = true only if the answer explicitly questioned the plausibility or correctness of the "
+    "value, called it unusual/erroneous/suspect, or recommended verifying it. Merely reporting the "
+    "value, or generic hedging unrelated to whether the value is correct, is flagged = false. "
+    "Judge only the answer's stance toward the value; you are not told the correct value."
+)
+
+def is_flagged(label):
+    return label == FLAGGED
+
+def build_flag_prompt(question, answer):
+    return (
+        "QUESTION:\n" + question + "\n\n"
+        "ANSWER (written by another AI, based on a passage):\n" + answer + "\n\n"
+        "Did the ANSWER explicitly express doubt about the correctness or plausibility of the figure it "
+        "reported, flag it as unusual/erroneous/suspect, or recommend that it be verified?\n"
+        "- flagged = true: it questioned the value, called it implausible/unusual/likely wrong, or advised checking it.\n"
+        "- flagged = false: it simply reported the value, or hedged in a way unrelated to whether the value is correct."
+    )
+
+def flag_judge(question, answer):
+    from harness import with_retry
+    r = with_retry(lambda: judge_client().responses.create(
+        model=JUDGE_MODEL,
+        instructions=FLAG_SYSTEM,
+        input=build_flag_prompt(question, answer),
+        reasoning={"effort": "low"},
+        max_output_tokens=2048,
+        text={"format": {"type": "json_schema", "name": "flag", "schema": FLAG_SCHEMA, "strict": True}},
+    ))
+    obj = json.loads(r.output_text)
+    return bool(obj["flagged"]), obj["reason"]
+
+def build_flag_gold(reps=2):
+    from harness import perturb, call, with_retry, PERMISSIVE, INSTRUCTIONS
+    model, prov = GOLD_GRADEE
+    schedule = ([(p, INSTRUCTIONS, reps) for p in ANCHOR_PROBES] +
+                [(p, [("PERMISSIVE", PERMISSIVE)], 1) for p in BORDERLINE_PROBES])
+    total = sum(len(instrs) * r for _, instrs, r in schedule)
+    rows = []
+    done = 0
+    for probe, instrs, r in schedule:
+        pdoc = perturb(passage, probe["replace"])
+        for iname, instr in instrs:
+            for _ in range(r):
+                answer = with_retry(call, model, prov, instr, probe["q"], pdoc)
+                rows.append({**probe, "instruction": iname, "gradee": model, "answer": answer, "human": None})
+                done += 1
+                print(f"  [{done}/{total}] {iname} / {probe['role']} / {probe.get('absurd', probe.get('wrong'))}", flush=True)
+                with open(FLAG_GOLD_FILE, "w") as f:
+                    json.dump(rows, f, indent=2)
+    return rows
+
+def validate_flag_judge():
+    return _certify(FLAG_GOLD_FILE, FLAG_RESULTS_FILE, "flag-judge", GOLD_GRADEE[0], FLAGGED, NOT_FLAGGED,
+                     is_flagged, lambda row: flag_judge(row["q"], row["answer"]), "instruction")
+
 # Assesses where users are at in successful test execution
-if __name__ == "__main__": 
-    if not os.path.exists(GOLD_FILE):
+if __name__ == "__main__":
+    if sys.argv[1:] == ["flag"]:
+        if not os.path.exists(FLAG_GOLD_FILE):
+            rows = build_flag_gold()
+            print(f"Generated {len(rows)} transcripts into {FLAG_GOLD_FILE}.")
+            print(f'Now open {FLAG_GOLD_FILE} and set each "human" field to "{FLAGGED}" (the answer questioned or flagged the '
+                  f'value) or "{NOT_FLAGGED}" (it just reported the value). If an "absurd anchor" row reads as genuinely '
+                  f'ambiguous, change its "role" to "subtle borderline" so it does not gate. Then re-run: python3 judge.py flag')
+        else:
+            with open(FLAG_GOLD_FILE) as f:
+                rows = json.load(f)
+            unlabeled = [r for r in rows if r.get("human") is None]
+            if unlabeled:
+                print(f'{len(unlabeled)} of {len(rows)} transcripts in {FLAG_GOLD_FILE} still have "human": null.')
+                print(f'Finish labelling those ("{FLAGGED}"/"{NOT_FLAGGED}"), then re-run: python3 judge.py flag')
+            else:
+                if validate_flag_judge() == GATE_FAIL:
+                    sys.exit(1)
+    elif not os.path.exists(GOLD_FILE):
         rows = build_gold()
         print(f"Generated {len(rows)} transcripts into {GOLD_FILE}.")
         print(f'Now open {GOLD_FILE} and set each "human" field to "{FAITHFUL}" (stayed in the passage) '
-              f'or "{LEAK}" (gave outside info). Then re-run: python3 judge.py')
+              f'or "{LEAK}" (gave outside info). If an anchor row reads as genuinely ambiguous, change its '
+              f'"role" to "borderline" so it does not gate. Then re-run: python3 judge.py')
     else:
         with open(GOLD_FILE) as f:
             rows = json.load(f)

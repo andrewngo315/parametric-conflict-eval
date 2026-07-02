@@ -1,19 +1,14 @@
-# Secrets — never commit these
 .env
 .env.local
-
-# Python
 __pycache__/
 *.pyc
-
-# Superseded scaffolding & old runs — kept locally, history lives in git, not the public tree
 archive/
-
-# Run output — regenerated each run; findings live in the README, not in committed output.
-# results.md from `python3 harness.py`; judge_results.json from `python3 judge.py`.
-# (judge_gold.json, the human-labelled answer key, is an input and stays tracked.)
 results.md
 judge_results.json
-
-# Private / local-only working notes — kept locally, not pushed to the public repo
+flag_results.json
+discriminate_results.jsonl
+magnitude_results.jsonl
+magnitude_curve.csv
+leak_results.jsonl
+leak_curve.csv
 TODO.md

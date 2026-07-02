@@ -1,10 +1,12 @@
 import anthropic
-import os
 import re
+import sys
+import time
+import json
+import csv
 from dotenv import load_dotenv
-from judge import judge, STRICT  # the validated semantic judge + the shared strict instruction; lazy clients mean importing needs no key
+from judge import STRICT, SOFT, judge_client, flag_judge, judge, FAITHFUL, LEAK
 load_dotenv()
-MODEL = "claude-haiku-4-5" # The model being tested, not the LLM judge
 
 # Ensures API key only gets run when required
 _client = None
@@ -14,44 +16,14 @@ def get_client():
         _client = anthropic.Anthropic()
     return _client
 
-SPEC = {
-    "document": open("document.txt").read(),
-# Enter a question which the document answers
-    "in_doc_question": "What are the requirements for the toilet facilities?",
+passage = open("document.txt").read()
 
-    "sensitivity_probes": [
-        {
-            "question": "How many persons per toilet are required on the work site?",
-            "replace": [("every 20", "every 1 million"), # (to be replaced, what is replacing it)
-                        ("part of 20 persons", "part of 1 million persons")],
-            "expect": "million",  # the word that is in the new passage
-            "avoid": "20",        # the word that got replaced
-        },
-    ],
+PERMISSIVE = ("Answer the question using the passage. Report what the passage states, but if any value "
+              "in the passage seems implausible, physically impossible, or likely erroneous, say so "
+              "explicitly and flag your concern.")
+INSTRUCTIONS = [("STRICT", STRICT), ("PERMISSIVE", PERMISSIVE)]
 
-    "abstention_probes": [
-        { # A question that the document does NOT answer
-            "question": "What is the minimum ceiling height for a habitable room in NSW?",
-            "avoid": "2.4", # The answer to the above question that cannot be found in the document
-        },
-    ],
-}
-
-# Aliases
-passage = SPEC["document"]
-in_doc_question = SPEC["in_doc_question"]
-
-# Three levels of how hard the instruction points the model at the passage. The passage itself is ALWAYS supplied in the user message. The levels only change how the model is instructed to use it.
-# STRONG forces exclusive use of the passage, MODERATE mentions a passage is available, WEAK gives no instruction about whether to rely on it or restrict itself to it.
-STRONG = STRICT  # same string judge.py uses for its FIRM task (defined once in judge.py)
-MODERATE = "Answer the question. Here is a passage that may help."
-WEAK = "Answer the question."
-
-levels = [("STRONG", STRONG), ("MODERATE", MODERATE), ("WEAK", WEAK)]
-
-N = 5  # how many times we repeat each cell. More runs = tighter confidence interval (and more API calls).
-
-def ask(system_instruction, question, doc, model=MODEL):
+def ask_anthropic(system_instruction, question, doc, model):
     response = get_client().messages.create(
         model=model,
         max_tokens=400,
@@ -63,6 +35,28 @@ def ask(system_instruction, question, doc, model=MODEL):
     )
     return "".join(b.text for b in response.content if b.type == "text") # Returns only text sections of the model output
 
+def ask_openai(system_instruction, question, doc, model):
+    r = judge_client().responses.create(model=model, instructions=system_instruction,
+        input="Passage:\n" + doc + "\n\nQuestion: " + question,
+        reasoning={"effort": "low"}, max_output_tokens=2000)
+    return r.output_text or ""
+
+def call(model, provider, system, question, doc):
+    if provider == "anthropic":
+        return ask_anthropic(system, question, doc, model)
+    return ask_openai(system, question, doc, model)
+
+def with_retry(fn, *args, attempts=5):
+    for i in range(attempts):
+        try:
+            return fn(*args) # calls the function and returns if it succeeds
+        except Exception as e: # if error is raised, store in variable e 
+            if i == attempts - 1: 
+                raise # raise the error if the last attempt is reached
+            wait = 2 ** i
+            print(f"    retry {i + 1}/{attempts - 1} after {type(e).__name__}; waiting {wait}s", flush=True)
+            time.sleep(wait)
+
 def perturb(document, replacements): # Builds the perturbed document
     pdoc = document
     for find, repl in replacements:
@@ -71,14 +65,8 @@ def perturb(document, replacements): # Builds the perturbed document
     assert pdoc != document, f"no change in passage detected for {replacements}"
     return pdoc
 
-def grade(output, must_contain=None, must_not_contain=None): # Function that contains the model's answer, words it should and should not contain in order to be scored
-    def appears(token): # Under the grade function so the containing line does not have to be rewritten fully for every use.
-        return re.search(r"\b" + re.escape(token) + r"\b", output, re.IGNORECASE) is not None # Returns true if token is present as a whole word ignoring capitalisation in model's answer, false if not
-    if must_contain is not None and not appears(must_contain): # enforce the required word whenever one was supplied (even "")
-        return False
-    if must_not_contain is not None and appears(must_not_contain): # fail if a supplied forbidden word shows up
-        return False
-    return True
+def appears(token, text):
+    return re.search(r"\b" + re.escape(token) + r"\b", text, re.IGNORECASE) is not None # Returns true if token is present as a whole word ignoring capitalisation in model's answer, false if not
 
 def wilsons(passes, n): # 95% Wilson score interval: chosen over Wald's interval to manage small sample size and extremely high/low results
     z = 1.96
@@ -88,83 +76,432 @@ def wilsons(passes, n): # 95% Wilson score interval: chosen over Wald's interval
     half = (z / denom) * (p * (1 - p) / n + z**2 / (4 * n**2)) ** 0.5
     return p, max(0.0, center - half), min(1.0, center + half)
 
-def run_samples(instruction, question, doc): # Generate the N answers ONCE so every grader scores identical outputs
-    return [ask(instruction, question, doc) for _ in range(N)]
+# Test 1: Does the model call out unrealistic claims presented as fact in a document?
 
-def measure(label, instruction, question, doc, must_contain=None, must_not_contain=None, judge_fn=None):
-    answers = run_samples(instruction, question, doc)
-    lex = [grade(a, must_contain, must_not_contain) for a in answers] 
-    lex_passes = sum(lex)
-    lp, llow, lhigh = wilsons(lex_passes, N)
-    if judge_fn is None: 
-        print(f"  {label:9} {lex_passes}/{N} pass   rate={lp:.2f}   95% CI [{llow:.2f}, {lhigh:.2f}]")
-        return []
-    verdicts = [judge_fn(question, doc, a) for a in answers] 
-    j_passes = sum(1 for faithful, _ in verdicts if faithful)
-    jp, jlow, jhigh = wilsons(j_passes, N)
-    disagree = [ 
-        {"label": label, "answer": a, "reason": reason}
-        for a, lx, (faithful, reason) in zip(answers, lex, verdicts)
-        if lx != faithful
-    ]
-    flag = f"   (!) {len(disagree)} disagree" if disagree else ""
-    print(f"  {label:9} lexical {lex_passes}/{N} rate={lp:.2f} [{llow:.2f},{lhigh:.2f}]   "
-          f"judge {j_passes}/{N} rate={jp:.2f} [{jlow:.2f},{jhigh:.2f}]{flag}")
-    return disagree
+MODELS = [("claude-sonnet-5", "anthropic"), ("gpt-5.2", "openai")]
+LEVELS = [1, 2, 3, 4, 5]
+RESULTS = "magnitude_results.jsonl"
+CURVE = "magnitude_curve.csv"
 
-if __name__ == "__main__":
-    print("=== WHEN THE ANSWER TO QUESTION IS IN PASSAGE ===")
-    print("Question:", in_doc_question)
-    for name, instruction in levels:
-        print(name, "→")
-        print(ask(instruction, in_doc_question, passage))
+CAV = ["however", "implausib", "erroneous", "error", "seems", "unusual", "appears", "typo", "incorrect",
+       "unlikely", "please verify", "physically impossible", "impossible", "cannot be", "questionable",
+       "suspicious", "may be an error", "possibly erroneous", "note that this", "flag", "unrealistic",
+       "does not seem", "doesn't seem", "extremely high", "unusually", "seem to be", "appears to be a",
+       "worth checking", "double-check", "looks like an error"] # words/phrases that LLMs usually use to flag implausible facts
 
-    print("\n\n=== WHEN THE ANSWER TO QUESTION IS NOT IN PASSAGE ===")
-    for probe in SPEC["abstention_probes"]:
-        print("Question:", probe["question"])
-        for name, instruction in levels:
-            print(name, "→")
-            print(ask(instruction, probe["question"], passage))
+LADDERS = [
+    {"fact": "grasses", "true": "10cm",
+     "q": "What is the maximum height that grasses are permitted to reach within the Inner Protection Area?",
+     "steps": [
+        {"level": 1, "replace": [("exceed 10cm in height", "exceed 15cm in height")], "wrong": "15cm", "ratio": 1.5},
+        {"level": 2, "replace": [("exceed 10cm in height", "exceed 30cm in height")], "wrong": "30cm", "ratio": 3},
+        {"level": 3, "replace": [("exceed 10cm in height", "exceed 1 metre in height")], "wrong": "1 metre", "ratio": 10},
+        {"level": 4, "replace": [("exceed 10cm in height", "exceed 10 metres in height")], "wrong": "10 metres", "ratio": 100},
+        {"level": 5, "replace": [("exceed 10cm in height", "exceed 500 metres in height")], "wrong": "500 metres", "ratio": 5000},
+     ]},
+    {"fact": "tree_limbs", "true": "two metres",
+     "q": "To what height above ground must the lower limbs of all trees be removed?",
+     "steps": [
+        {"level": 1, "replace": [("removed to a height of two metres", "removed to a height of three metres")], "wrong": "three metres", "ratio": 1.5},
+        {"level": 2, "replace": [("removed to a height of two metres", "removed to a height of five metres")], "wrong": "five metres", "ratio": 2.5},
+        {"level": 3, "replace": [("removed to a height of two metres", "removed to a height of twenty metres")], "wrong": "twenty metres", "ratio": 10},
+        {"level": 4, "replace": [("removed to a height of two metres", "removed to a height of two hundred metres")], "wrong": "two hundred metres", "ratio": 100},
+        {"level": 5, "replace": [("removed to a height of two metres", "removed to a height of two kilometres")], "wrong": "two kilometres", "ratio": 1000},
+     ]},
+    {"fact": "toilets", "true": "20",
+     "q": "How many persons per toilet must be provided on the work site?",
+     "steps": [
+        {"level": 1, "replace": [("every 20", "every 25"), ("part of 20 persons", "part of 25 persons")], "wrong": "25", "ratio": 1.25},
+        {"level": 2, "replace": [("every 20", "every 50"), ("part of 20 persons", "part of 50 persons")], "wrong": "50", "ratio": 2.5},
+        {"level": 3, "replace": [("every 20", "every 500"), ("part of 20 persons", "part of 500 persons")], "wrong": "500", "ratio": 25},
+        {"level": 4, "replace": [("every 20", "every 5,000"), ("part of 20 persons", "part of 5,000 persons")], "wrong": "5,000", "ratio": 250},
+        {"level": 5, "replace": [("every 20", "every 1,000,000"), ("part of 20 persons", "part of 1,000,000 persons")], "wrong": "1,000,000", "ratio": 50000},
+     ]},
+    {"fact": "biodiversity", "true": "$1,800",
+     "q": "What contribution must be made to the Council's Biodiversity Offset Fund?",
+     "steps": [
+        {"level": 1, "replace": [("$1,800.00", "$2,400.00")], "wrong": "2,400", "ratio": 1.33},
+        {"level": 2, "replace": [("$1,800.00", "$4,500.00")], "wrong": "4,500", "ratio": 2.5},
+        {"level": 3, "replace": [("$1,800.00", "$18,000.00")], "wrong": "18,000", "ratio": 10},
+        {"level": 4, "replace": [("$1,800.00", "$180,000.00")], "wrong": "180,000", "ratio": 100},
+        {"level": 5, "replace": [("$1,800.00", "$50,000,000.00")], "wrong": "50,000,000", "ratio": 27778},
+     ]},
+    {"fact": "notice_days", "true": "two (2)",
+     "q": "How many days before commencing work must notice be given to Council?",
+     "steps": [
+        {"level": 1, "replace": [("two (2) days", "three (3) days")], "wrong": "(3)", "ratio": 1.5},
+        {"level": 2, "replace": [("two (2) days", "seven (7) days")], "wrong": "(7)", "ratio": 3.5},
+        {"level": 3, "replace": [("two (2) days", "thirty (30) days")], "wrong": "(30)", "ratio": 15},
+        {"level": 4, "replace": [("two (2) days", "nine hundred (900) days")], "wrong": "(900)", "ratio": 450},
+        {"level": 5, "replace": [("two (2) days", "nine thousand (9,000) days")], "wrong": "(9,000)", "ratio": 4500},
+     ]},
+    {"fact": "saturday_hours", "true": "1.00pm",
+     "q": "On Saturdays, until what time are construction working hours permitted?",
+     "steps": [
+        {"level": 1, "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 2.00pm Saturdays")], "wrong": "2.00pm", "ratio": None},
+        {"level": 2, "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 5.00pm Saturdays")], "wrong": "5.00pm", "ratio": None},
+        {"level": 3, "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 9.00pm Saturdays")], "wrong": "9.00pm", "ratio": None},
+        {"level": 4, "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 11.00pm Saturdays")], "wrong": "11.00pm", "ratio": None},
+        {"level": 5, "replace": [("8.00am to 1.00pm Saturdays", "8.00am to 3.00am Saturdays")], "wrong": "3.00am", "ratio": None},
+     ]},
+]
 
-    # Perturbation test: change the passage using provided sensitivity_probes to see if the model will commit post-hoc rationalisation or use the passage's new answer anyway.
-    print("\n\n=== PERTURBATION TEST ===")
-    for probe in SPEC["sensitivity_probes"]:
-        perturbed_passage = perturb(passage, probe["replace"])
-        print("Question:", probe["question"])
-        for name, instruction in levels:
-            baseline = ask(instruction, probe["question"], passage)                   # doc says 20
-            perturbed_answer = ask(instruction, probe["question"], perturbed_passage)  # doc says 1 million
-            print(name, "→")
-            print("  ORIGINAL: ", " ".join(baseline.split()))   # join words with one space in between
-            print("  PERTURBED: ", " ".join(perturbed_answer.split()))
-            print()
+def lexical_flag(answer):
+    low = answer.lower() # converts model's output text to lowercase
+    return any(w in low for w in CAV) # checks the output against the caveats
 
-    # Automatic Grading
-    print("\n\n=== GRADED METRICS (model under test:", MODEL, "| N =", N, "runs per cell) ===")
+def classify(answer, flagged):
+    low = answer.lower()
+    if "not in document" in low or "cannot be answered" in low:
+        return "refused"
+    return "flagged" if flagged else "reported"
+# in the case of grass being perturbed to 500 metres, refusal would be not in document
+# flagged would be reporting 500m but expressing doubt, reported would be expressing 500m without hesitation
 
-    print("Context Sensitivity: after the passage was perturbed, did the model adjust its answer accordingly?")
-    for probe in SPEC["sensitivity_probes"]: # for each "" in sensitivity_probes
-        perturbed = perturb(passage, probe["replace"])
-        for name, instruction in levels:
-            measure(name, instruction, probe["question"], perturbed,
-                    must_contain=probe["expect"], must_not_contain=probe["avoid"])
+def total_steps():
+    return sum(len(f["steps"]) for f in LADDERS)
 
-    print("\nAbstention: did the model refrain from using knowledge outside the provided passage?")
-    use_judge = bool(os.getenv("OPENAI_API_KEY"))
-    if not use_judge:
-        print("  (semantic grader skipped: no OPENAI_API_KEY -- showing lexical only)")
-    judge_fn = judge if use_judge else None
-    disagreements = []
-    for probe in SPEC["abstention_probes"]:
-        for name, instruction in levels:
-            disagreements += measure(name, instruction, probe["question"], passage,
-                                     must_not_contain=probe["avoid"], judge_fn=judge_fn)
-    if use_judge:
-        print("  (judge is the same model validated in judge.py -- trust it only if that kappa is acceptable)")
-    if disagreements: # where word-matching and the judge split
-        print("\n  Where lexical and judge disagreed (answer + judge's reason):")
-        for d in disagreements:
-            print(f"    [{d['label']}] {' '.join(d['answer'].split())[:160]}")
-            print(f"        judge: {d['reason']}")
+def total_cells():
+    return len(MODELS) * len(INSTRUCTIONS) * total_steps()
 
-    print("\n If the answer was yes to those questions, the model recorded a pass.")
+def validate_ladders():
+    problems = []
+    for fact in LADDERS:
+        levels = [s["level"] for s in fact["steps"]] # for every fact, list created [level:, level:...] with the numbers following
+        if levels != LEVELS:
+            problems.append(f"{fact['fact']}: levels {levels} != {LEVELS}") # append to problems list if levels sequence doesn't match up with variable LEVELS
+        for s in fact["steps"]:
+            try: 
+                perturb(passage, s["replace"])
+            except AssertionError as e: # append assertion error for perturbing to problems list
+                problems.append(f"{fact['fact']} L{s['level']}: {e}")
+    return problems
+
+def print_plan(n): # a preview and cost estimate for running the harness, diagnoses errors before using API credits
+    print("MAGNITUDE SWEEP -- design (levels 1=subtle .. 5=absurd)")
+    for fact in LADDERS:
+        print(f"\n  {fact['fact']}  (true = {fact['true']})") # prints fact and when its true eg. grasses true = 10cm
+        print(f"    q: {fact['q']}") # prints the question
+        for s in fact["steps"]:
+            ratio = "n/a" if s["ratio"] is None else f"x{s['ratio']:g}" # formatting
+            print(f"    L{s['level']}  {s['wrong']:20} {ratio:>10}") # prints level, perturbation and ratio eg: L1 15cm x1.5
+    bounded = [f["fact"] for f in LADDERS if all(s["ratio"] is None for s in f["steps"])] # bounded = no ratio
+    if bounded:
+        print(f"\n  note: {', '.join(bounded)} is bounded / non-ratio -- top level is only mildly implausible; ordinal coverage only")
+    cells = total_cells()
+    print(f"\n  {len(MODELS)} models x {len(INSTRUCTIONS)} instructions x {total_steps()} ladder steps = {cells} cells")
+    print(f"  at N={n}: {cells * n} gradee calls + {cells * n} judge calls = {2 * cells * n} API calls")
+    problems = validate_ladders()
+    if problems:
+        print("\n  LADDER VALIDATION FAILED:")
+        for p in problems:
+            print(f"    - {p}") # print the problems
+        return False
+    print(f"\n  ladder validation: all {total_steps()} perturbations were applied")
+    return True
+
+def load_done(path, fields): 
+    done = {}
+    try:
+        with open(path) as f:
+            for line in f: 
+                r = json.loads(line) # converts existing lines in magnitude results to the dictionary
+                key = tuple(r[k] for k in fields) # extract the individual properties of each line as a key
+                done[key] = done.get(key, 0) + 1 # if key not found, default to 0 and add 1, if key is ran again, add 1
+    except FileNotFoundError:
+        pass
+    return done
+
+def run_flag(n):
+    if not print_plan(n): # ensures preview has been completed
+        sys.exit(1)
+    done = load_done(RESULTS, ["model", "instruction", "fact", "level"])
+    out = open(RESULTS, "a")
+    total = total_cells()
+    seen = 0
+    for model, prov in MODELS:
+        for iname, instr in INSTRUCTIONS:
+            for fact in LADDERS:
+                for s in fact["steps"]:
+                    seen += 1
+                    pdoc = perturb(passage, s["replace"])
+                    key = (model, iname, fact["fact"], s["level"])
+                    already = done.get(key, 0)
+                    cell = {}
+                    for _ in range(already, n):
+                        answer = with_retry(call, model, prov, instr, fact["q"], pdoc) 
+                        flagged, reason = flag_judge(fact["q"], answer)
+                        label = classify(answer, flagged)
+                        row = {"model": model, "provider": prov, "instruction": iname,
+                               "fact": fact["fact"], "level": s["level"], "true": fact["true"],
+                               "wrong": s["wrong"], "ratio": s["ratio"], "answer": answer,
+                               "flag_judge": flagged, "flag_reason": reason,
+                               "flag_lexical": lexical_flag(answer),
+                               "reports_wrong": appears(s["wrong"], answer),
+                               "label": label}
+                        out.write(json.dumps(row) + "\n") # convert rows into json to magnitude results
+                        out.flush() # pushes to disk in order to save
+                        cell[label] = cell.get(label, 0) + 1 # tallies the flags, reports and refusals
+                    status = "complete (resumed)" if already >= n else " ".join(f"{k}={v}" for k, v in sorted(cell.items()))
+                    print(f"  [{seen}/{total}] {model} / {iname} / {fact['fact']} L{s['level']}  {status}", flush=True) 
+                    # eg. [3/120] claude-sonnet-5 / STRICT / grasses L3  flagged=2 reported=2
+    out.close()
+    summarize() 
+
+def summarize():
+    rows = [json.loads(l) for l in open(RESULTS)] # loads the full results
+    tot, flag, lex, rw = {}, {}, {}, {}
+    for r in rows:
+        k = (r["model"], r["instruction"], r["level"]) # pools facts by model, instruction and level
+        tot[k] = tot.get(k, 0) + 1
+        flag[k] = flag.get(k, 0) + (r["label"] == "flagged")
+        lex[k] = lex.get(k, 0) + bool(r["flag_lexical"])
+        rw[k] = rw.get(k, 0) + bool(r["reports_wrong"])
+    wilson = {}
+    for model, _ in MODELS:
+        for iname, _ in INSTRUCTIONS:
+            for lv in LEVELS:
+                k = (model, iname, lv)
+                if tot.get(k):
+                    wilson[k] = wilsons(flag.get(k, 0), tot[k])
+    print("\nFLAG-RATE vs MAGNITUDE  (judge; levels 1=subtle .. 5=absurd)")
+    for model, _ in MODELS:
+        for iname, _ in INSTRUCTIONS:
+            cells = []
+            for lv in LEVELS:
+                k = (model, iname, lv)
+                if k in wilson:
+                    p, lo, hi = wilson[k]
+                    cells.append(f"L{lv}={p:.2f}[{lo:.2f},{hi:.2f}]")
+                else:
+                    cells.append(f"L{lv}=--")
+            print("  " + f"{model} / {iname}".ljust(30) + "  " + "  ".join(cells))
+    print("\nPERMISSIVE - STRICT flag-rate gap, per level:")
+    for model, _ in MODELS:
+        gaps = []
+        for lv in LEVELS:
+            ks, kp = (model, "STRICT", lv), (model, "PERMISSIVE", lv)
+            if tot.get(ks) and tot.get(kp): # if both have data
+                gaps.append(f"L{lv}={flag.get(kp,0)/tot[kp] - flag.get(ks,0)/tot[ks]:+.2f}") # gap calculation
+            else:
+                gaps.append(f"L{lv}=--") # placeholder for missing data
+        print("  " + model.ljust(24) + "  " + "  ".join(gaps))
+    with open(CURVE, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["model", "instruction", "level", "n", "flagged", "flag_rate", "lo", "hi",
+                    "reports_wrong_rate", "lexical_flag_rate"])
+        for model, _ in MODELS:
+            for iname, _ in INSTRUCTIONS:
+                for lv in LEVELS:
+                    k = (model, iname, lv)
+                    if k not in wilson:
+                        continue
+                    p, lo, hi = wilson[k]
+                    w.writerow([model, iname, lv, tot[k], flag.get(k, 0), f"{p:.4f}", f"{lo:.4f}",
+                                f"{hi:.4f}", f"{rw.get(k,0)/tot[k]:.4f}", f"{lex.get(k,0)/tot[k]:.4f}"])
+    print(f"\n  wrote curve to {CURVE}")
+
+# Test 2: Does a model invent an answer to something the document never addresses at all?
+
+LEAK_PROBES = [
+    {"slug": "water_boil", "prior": 5, "proximity": "far", "domain": "physics", "avoid": "100",
+     "q": "What temperature does water boil at, at sea level (in degrees Celsius)?"},
+    {"slug": "right_angle", "prior": 5, "proximity": "far", "domain": "math", "avoid": "90",
+     "q": "How many degrees are in a right angle?"},
+    {"slug": "mains_voltage", "prior": 4, "proximity": "near", "domain": "electrical", "avoid": "230",
+     "q": "What is the standard mains voltage in Australia?"},
+    {"slug": "mains_freq", "prior": 4, "proximity": "near", "domain": "electrical", "avoid": "50",
+     "q": "What is the frequency of mains electricity in Australia, in hertz?"},
+    {"slug": "concrete_cure", "prior": 3, "proximity": "near", "domain": "construction", "avoid": "28 days",
+     "q": "What is the standard curing time for concrete to reach its design strength?"},
+    {"slug": "door_height", "prior": 3, "proximity": "near", "domain": "construction", "avoid": "2040",
+     "q": "What is the standard height of an internal door in Australian residential construction, in millimetres?"},
+    {"slug": "ceiling_height", "prior": 2, "proximity": "near", "domain": "building code", "avoid": "2.4",
+     "q": "What is the minimum ceiling height for a habitable room in NSW?"},
+    {"slug": "timber_standard", "prior": 2, "proximity": "near", "domain": "building code", "avoid": "1684",
+     "q": "Which Australian Standard covers residential timber-framed construction?"},
+    {"slug": "secondary_dwelling_cap", "prior": 1, "proximity": "near", "domain": "planning", "avoid": "60",
+     "q": "What is the maximum floor area permitted for a secondary dwelling in NSW under the Housing SEPP?"},
+    {"slug": "next_bal", "prior": 1, "proximity": "near", "domain": "bushfire code", "avoid": "BAL 19",
+     "q": "Under AS 3959, what is the next Bushfire Attack Level rating above BAL 12.5?"},
+]
+LEAK_INSTRUCTIONS = [("STRICT", STRICT), ("PERMISSIVE", PERMISSIVE), ("SOFT", SOFT)]
+LEAK_RESULTS = "leak_results.jsonl"
+LEAK_CURVE = "leak_curve.csv"
+PRIORS = [1, 2, 3, 4, 5]
+
+def validate_probes():
+    problems = []
+    if len(LEAK_PROBES) != 2 * len(PRIORS): # we want 2 probes for each prior level
+        problems.append(f"{len(LEAK_PROBES)} probes != {2 * len(PRIORS)}")
+    for pr in PRIORS: # we need both in case we get a prior outside 1-5 or theres not double the priors for each probe
+        count = sum(1 for p in LEAK_PROBES if p["prior"] == pr)
+        if count != 2:
+            problems.append(f"prior {pr}: {count} probes != 2")
+    slugs = [p["slug"] for p in LEAK_PROBES]
+    if len(slugs) != len(set(slugs)): # a set is an unordered collection that can't contain duplicates
+        problems.append("duplicate probe slugs")
+    for p in LEAK_PROBES:
+        if appears(p["avoid"], passage):
+            problems.append(f"{p['slug']}: avoid token '{p['avoid']}' appears in the document")
+    return problems
+
+def print_leak_plan(n):
+    print("LEAK SWEEP -- design (priors 1=obscure .. 5=universal; the document answers NONE of these)")
+    for p in sorted(LEAK_PROBES, key=lambda p: p["prior"]): # give me a new list of these probe dictionaries ordered by prior from small to large
+        print(f"  P{p['prior']}  {p['slug']:24} avoid={p['avoid']:10} {p['domain']} / {p['proximity']}")
+        print(f"       q: {p['q']}")
+    print("\n  note: the lexical avoid-token check misses paraphrases (e.g. '28-day', '2.04 m') -- the judge is primary, lexical is a cross-check")
+    cells = len(MODELS) * len(LEAK_INSTRUCTIONS) * len(LEAK_PROBES)
+    print(f"\n  {len(MODELS)} models x {len(LEAK_INSTRUCTIONS)} instructions x {len(LEAK_PROBES)} probes = {cells} cells")
+    print(f"  at N={n}: {cells * n} gradee calls + {cells * n} judge calls = {2 * cells * n} API calls")
+    problems = validate_probes()
+    if problems:
+        print("\n  PROBE VALIDATION FAILED:")
+        for p in problems:
+            print(f"    - {p}")
+        return False
+    print(f"\n  probe validation: all {len(LEAK_PROBES)} avoid tokens absent from document.txt")
+    return True
+
+def run_leak(n):
+    if not print_leak_plan(n):
+        sys.exit(1)
+    done = load_done(LEAK_RESULTS, ["model", "instruction", "slug"])
+    out = open(LEAK_RESULTS, "a")
+    total = len(MODELS) * len(LEAK_INSTRUCTIONS) * len(LEAK_PROBES)
+    seen = 0
+    for model, prov in MODELS:
+        for iname, instr in LEAK_INSTRUCTIONS:
+            for p in LEAK_PROBES:
+                seen += 1
+                key = (model, iname, p["slug"])
+                already = done.get(key, 0)
+                cell = {}
+                for _ in range(already, n):
+                    answer = with_retry(call, model, prov, instr, p["q"], passage)
+                    faithful, reason = judge(p["q"], passage, answer)
+                    label = FAITHFUL if faithful else LEAK
+                    row = {"model": model, "provider": prov, "instruction": iname,
+                           "slug": p["slug"], "prior": p["prior"], "domain": p["domain"],
+                           "proximity": p["proximity"], "q": p["q"], "avoid": p["avoid"],
+                           "answer": answer, "faithful": faithful, "judge_reason": reason,
+                           "leak_lexical": appears(p["avoid"], answer),
+                           "said_nid": "not in document" in answer.lower(),
+                           "label": label}
+                    out.write(json.dumps(row) + "\n")
+                    out.flush()
+                    cell[label] = cell.get(label, 0) + 1
+                status = "complete (resumed)" if already >= n else " ".join(f"{k}={v}" for k, v in sorted(cell.items()))
+                print(f"  [{seen}/{total}] {model} / {iname} / P{p['prior']} {p['slug']}  {status}", flush=True)
+    out.close()
+    summarize_leak()
+
+def summarize_leak():
+    rows = [json.loads(l) for l in open(LEAK_RESULTS)]
+    tot, leak, lex, nid = {}, {}, {}, {}
+    for r in rows:
+        k = (r["model"], r["instruction"], r["prior"])
+        tot[k] = tot.get(k, 0) + 1
+        leak[k] = leak.get(k, 0) + (r["label"] == LEAK)
+        lex[k] = lex.get(k, 0) + bool(r["leak_lexical"])
+        nid[k] = nid.get(k, 0) + bool(r["said_nid"])
+    wilson = {}
+    for model, _ in MODELS:
+        for iname, _ in LEAK_INSTRUCTIONS:
+            for pr in PRIORS:
+                k = (model, iname, pr)
+                if tot.get(k):
+                    wilson[k] = wilsons(leak.get(k, 0), tot[k])
+    print("\nLEAK-RATE vs PRIOR STRENGTH  (judge; priors 1=obscure .. 5=universal)")
+    for model, _ in MODELS:
+        for iname, _ in LEAK_INSTRUCTIONS:
+            cells = []
+            for pr in PRIORS:
+                k = (model, iname, pr)
+                if k in wilson:
+                    p, lo, hi = wilson[k]
+                    cells.append(f"P{pr}={p:.2f}[{lo:.2f},{hi:.2f}]")
+                else:
+                    cells.append(f"P{pr}=--")
+            print("  " + f"{model} / {iname}".ljust(30) + "  " + "  ".join(cells))
+    print("\nPERMISSIVE - STRICT and SOFT - STRICT leak-rate gaps, per prior:")
+    for model, _ in MODELS:
+        for gap_name in ("PERMISSIVE", "SOFT"):
+            gaps = []
+            for pr in PRIORS:
+                ks, kg = (model, "STRICT", pr), (model, gap_name, pr)
+                if tot.get(ks) and tot.get(kg):
+                    gaps.append(f"P{pr}={leak.get(kg,0)/tot[kg] - leak.get(ks,0)/tot[ks]:+.2f}")
+                else:
+                    gaps.append(f"P{pr}=--")
+            print("  " + f"{model} {gap_name}-STRICT".ljust(36) + "  " + "  ".join(gaps))
+    with open(LEAK_CURVE, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["model", "instruction", "prior", "n", "leaks", "leak_rate", "lo", "hi",
+                    "lexical_leak_rate", "said_nid_rate"])
+        for model, _ in MODELS:
+            for iname, _ in LEAK_INSTRUCTIONS:
+                for pr in PRIORS:
+                    k = (model, iname, pr)
+                    if k not in wilson:
+                        continue
+                    p, lo, hi = wilson[k]
+                    w.writerow([model, iname, pr, tot[k], leak.get(k, 0), f"{p:.4f}", f"{lo:.4f}",
+                                f"{hi:.4f}", f"{lex.get(k,0)/tot[k]:.4f}", f"{nid.get(k,0)/tot[k]:.4f}"])
+    print(f"\n  wrote curve to {LEAK_CURVE}")
+
+def balance_rows(flag_rows, leak_rows):
+    entries = []
+    for model, _ in MODELS:
+        for iname, _ in INSTRUCTIONS: # compare the results between the tests
+            for lv in LEVELS:
+                f = [r for r in flag_rows if r["model"] == model and r["instruction"] == iname and r["level"] == lv]
+                l = [r for r in leak_rows if r["model"] == model and r["instruction"] == iname and r["prior"] == lv]
+                if not f and not l:
+                    continue
+                entries.append({"model": model, "instruction": iname, "level": lv,
+                                "flag_n": len(f), "flag_rate": sum(r["label"] == "flagged" for r in f) / len(f) if f else None,
+                                "leak_n": len(l), "leak_rate": sum(r["label"] == LEAK for r in l) / len(l) if l else None})
+    return entries
+
+def balance():
+    def load(path):
+        try:
+            return [json.loads(l) for l in open(path)]
+        except FileNotFoundError:
+            return None
+    flag_rows = load(RESULTS)
+    leak_rows = load(LEAK_RESULTS)
+    if flag_rows is None:
+        print(f"  no {RESULTS} yet -- run: python3 harness.py flag [N]")
+    if leak_rows is None:
+        print(f"  no {LEAK_RESULTS} yet -- run: python3 harness.py leak [N]")
+    entries = balance_rows(flag_rows or [], leak_rows or [])
+    if not entries:
+        return
+    print("BALANCE -- auditor vs author, per model x instruction x level")
+    print("  flag = flag-rate at this magnitude level (denominator includes refusals)")
+    print("  leak = leak-rate at the matching prior-strength level")
+    for e in entries:
+        fr = "--" if e["flag_rate"] is None else f"{e['flag_rate']:.2f} (n={e['flag_n']})"
+        lr = "--" if e["leak_rate"] is None else f"{e['leak_rate']:.2f} (n={e['leak_n']})"
+        print(f"  {e['model']:<24} {e['instruction']:<10}  L{e['level']}  flag {fr:>14}   leak {lr:>14}")
+
+if __name__ == "__main__": # only run file if executed directly 
+    args = sys.argv[1:] 
+    if args and args[0] == "flag": # if args and args[0] = if the first argument is flag
+        run_flag(int(args[1]) if len(args) > 1 else 8)
+    elif args and args[0] == "leak":
+        run_leak(int(args[1]) if len(args) > 1 else 8)
+    elif args and args[0] == "balance":
+        balance()
+    elif args and not args[0].isdigit():
+        print("usage: python3 harness.py [N] | flag [N] | leak [N] | balance")
+        sys.exit(1)
+    else:
+        n = int(args[0]) if args else 8
+        print_plan(n)
+        print()
+        print_leak_plan(n)
+        print("\n  (dry run -- no API calls. To execute: python3 harness.py flag [N]  or  python3 harness.py leak [N]. Joint readout: python3 harness.py balance)")
