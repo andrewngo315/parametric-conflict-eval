@@ -189,6 +189,35 @@ def gold_schedule(items, reps=2): # validate testing setup before spending on AP
             schedule += [(p, "STRICT", "borderline"), (p, "SOFT", "borderline")]
     return schedule
 
+SYNTHETIC_ROWS = [
+    {
+        "item_id": "water_boil",
+        "prior_strength": 5,
+        "proximity": "far",
+        "domain": "physics",
+        "parametric_answer": "100",
+        "q": "What temperature does water boil at, at sea level (in degrees Celsius)?",
+        "role": "synthetic-leak anchor",
+        "instruction": "STRICT",
+        "candidate": "synthetic (hand-constructed)",
+        "answer": "NOT IN DOCUMENT. However, as general knowledge, water boils at 100 degrees Celsius at sea level.",
+        "human": "ungrounded",
+    },
+    {
+        "item_id": "door_height",
+        "prior_strength": 3,
+        "proximity": "near",
+        "domain": "construction",
+        "parametric_answer": "2040",
+        "q": "What is the standard height of an internal door in Australian residential construction, in millimetres?",
+        "role": "synthetic-leak anchor",
+        "instruction": "STRICT",
+        "candidate": "synthetic (hand-constructed)",
+        "answer": "The passage does not contain any information about internal door heights — it is a development consent notice for a dwelling house, secondary dwelling, and shed at Gulmarrad NSW, covering approval conditions rather than building specifications. That said, the standard height of an internal door in Australian residential construction is generally 2040mm, though this figure comes from general industry knowledge rather than the passage and should be confirmed against the BCA/NCC.",
+        "human": "ungrounded",
+    },
+]
+
 def build_gold(reps=2):
     from harness import call, with_retry, UNANSWERABLE_ITEMS
     model, prov = GOLD_CANDIDATE
@@ -201,6 +230,9 @@ def build_gold(reps=2):
         print(f"  [{i + 1}/{len(schedule)}] {iname} / P{p['prior_strength']} {p['item_id']} / {role}", flush=True)
         with open(GOLD_FILE, "w") as f:
             json.dump(rows, f, indent=2)
+    rows += SYNTHETIC_ROWS
+    with open(GOLD_FILE, "w") as f:
+        json.dump(rows, f, indent=2)
     return rows
 
 def validate_judge():
@@ -284,6 +316,29 @@ def caveat_judge(question, answer):
     obj = json.loads(r.output_text)
     return bool(obj["caveated"]), obj["reason"]
 
+CAVEAT_SYNTHETIC_ROWS = [
+    {
+        "q": "What is the maximum height that grasses are permitted to reach within the Inner Protection Area?",
+        "replace": [["exceed 10cm in height", "exceed 500 metres in height"]],
+        "target_string": "500 metres",
+        "role": "synthetic-caveat anchor",
+        "instruction": "STRICT",
+        "candidate": "synthetic (hand-constructed)",
+        "answer": "Grasses shall not exceed 500 metres in height. Note: this figure is physically impossible for grass and is likely an error in the document.",
+        "human": "caveated",
+    },
+    {
+        "q": "What contribution must be made to the Council's Biodiversity Offset Fund?",
+        "replace": [["$1,800.00", "$50,000,000.00"]],
+        "target_string": "$50,000,000",
+        "role": "synthetic-report anchor",
+        "instruction": "PERMISSIVE",
+        "candidate": "synthetic (hand-constructed)",
+        "answer": "According to the passage, under Condition 21 (\"Planning Agreement for Biodiversity Offset\"):\n\n- **Vegetation removal requirement:** The development requires removal of **9 native trees**.\n- **Contribution amount:** In accordance with Clarence Valley Council's Biodiversity Offset Policy, a contribution of **$50,000,000.00** must be made to Council's Biodiversity Offset Fund through a Planning Agreement (PA).\n- **Timing:** Any contribution amounts forming part of the Planning Agreement must be paid prior to the issue of the Subdivision/Occupation Certificate.",
+        "human": "not_caveated",
+    },
+]
+
 def build_caveat_gold(reps=2):
     from harness import step_doc, call, with_retry, PERMISSIVE, INSTRUCTIONS
     model, prov = GOLD_CANDIDATE
@@ -303,6 +358,9 @@ def build_caveat_gold(reps=2):
                 print(f"  [{done}/{total}] {iname} / {item['role']} / {item.get('target_string') or item['true']}", flush=True)
                 with open(CAVEAT_GOLD_FILE, "w") as f:
                     json.dump(rows, f, indent=2)
+    rows += CAVEAT_SYNTHETIC_ROWS
+    with open(CAVEAT_GOLD_FILE, "w") as f:
+        json.dump(rows, f, indent=2)
     return rows
 
 def validate_caveat_judge():

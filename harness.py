@@ -26,19 +26,23 @@ INSTRUCTIONS = [("STRICT", STRICT), ("PERMISSIVE", PERMISSIVE)]
 def ask_anthropic(system_instruction, question, doc, model):
     response = get_client().messages.create(
         model=model,
-        max_tokens=400,
+        max_tokens=1200,
         system=system_instruction,
         messages=[{
             "role": "user",
             "content": "Passage:\n" + doc + "\n\nQuestion: " + question,
         }],
     )
+    if response.stop_reason == "max_tokens":
+        print(f"    WARNING: answer truncated at max_tokens ({model})", flush=True)
     return "".join(b.text for b in response.content if b.type == "text") # Returns only text sections of the model output
 
 def ask_openai(system_instruction, question, doc, model):
     r = judge_client().responses.create(model=model, instructions=system_instruction,
         input="Passage:\n" + doc + "\n\nQuestion: " + question,
         reasoning={"effort": "low"}, max_output_tokens=2000)
+    if r.status == "incomplete":
+        print(f"    WARNING: answer truncated at max_output_tokens ({model})", flush=True)
     return r.output_text or ""
 
 def call(model, provider, system, question, doc):
