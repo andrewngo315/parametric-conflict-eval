@@ -7,8 +7,6 @@ abstention_judge_results.json
 caveat_judge_results.json
 discriminate_results.jsonl
 caveat_results.jsonl
-caveat_curve.csv
 abstention_results.jsonl
-abstention_curve.csv
 TODO.md
 caveat_results.pre_stance.jsonl
