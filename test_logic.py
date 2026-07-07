@@ -7,10 +7,13 @@ import unittest
 from unittest import mock
 
 from config import (perturb, with_retry, MODELS, FLAG_INVITING, SYSTEM_INSTRUCTIONS,
-                    appears, passage, step_doc)
+                    appears, passage, step_doc, build_batch_message_params)
 from harness import (wilson_interval, PERTURBATION_LADDERS, SEVERITIES, validate_ladders,
-                     total_steps, classify, lexical_caveat, UNANSWERABLE_ITEMS, validate_items,
-                     load_done, tradeoff_rows, PRIOR_STRENGTHS)
+                     total_steps, total_cells, classify, lexical_caveat, UNANSWERABLE_ITEMS, validate_items,
+                     load_done, tradeoff_rows, PRIOR_STRENGTHS,
+                     encode_caveat_custom_id, decode_caveat_custom_id,
+                     encode_abstention_custom_id, decode_abstention_custom_id,
+                     caveat_wave_plan, abstention_wave_plan)
 from judge import (cohens_kappa, FAITHFUL, UNGROUNDED,
                    judge_gate, anchor_disagreements, GATE_PASS, GATE_FAIL, KAPPA_THRESHOLD,
                    QUESTIONED, SILENT, ENDORSED, CAVEAT_LABELS, CAVEAT_SCHEMA, build_caveat_prompt,
@@ -437,6 +440,96 @@ class TestTradeoffRows(unittest.TestCase):
 
     def test_both_empty(self):
         self.assertEqual(tradeoff_rows([], []), [])
+
+
+class TestCustomIds(unittest.TestCase):
+    def test_caveat_roundtrip(self):
+        cid = encode_caveat_custom_id("grasses", 2, "SOURCE_EXCLUSIVE", 3)
+        self.assertEqual(decode_caveat_custom_id(cid),
+                          {"fact": "grasses", "severity": 2, "instruction": "SOURCE_EXCLUSIVE", "rep": 3})
+
+    def test_caveat_literal_format(self):
+        self.assertEqual(encode_caveat_custom_id("grasses", 2, "SOURCE_EXCLUSIVE", 3),
+                          "cv-grasses-s2-SOURCE_EXCLUSIVE-r3")
+
+    def test_abstention_roundtrip(self):
+        cid = encode_abstention_custom_id("secondary_dwelling_cap", "WEAK_GROUNDING", 5)
+        self.assertEqual(decode_abstention_custom_id(cid),
+                          {"item_id": "secondary_dwelling_cap", "instruction": "WEAK_GROUNDING", "rep": 5})
+
+    def test_decode_rejects_wrong_prefix(self):
+        with self.assertRaises(ValueError):
+            decode_caveat_custom_id(encode_abstention_custom_id("water_boil", "FLAG_INVITING", 0))
+        with self.assertRaises(ValueError):
+            decode_abstention_custom_id(encode_caveat_custom_id("grasses", 0, "FLAG_INVITING", 0))
+
+
+class TestCaveatWavePlan(unittest.TestCase):
+    INSTR = [("SOURCE_EXCLUSIVE", "sys")]
+    LADDER = [{"fact": "grasses", "q": "q", "steps": [{"severity": 0}, {"severity": 1}, {"severity": 2}]}]
+
+    def test_empty_when_all_done(self):
+        done = {("m", "SOURCE_EXCLUSIVE", "grasses", s): 5 for s in (0, 1, 2)}
+        wave1, wave2 = caveat_wave_plan(done, 5, "m", instructions=self.INSTR, ladders=self.LADDER)
+        self.assertEqual((wave1, wave2), ([], []))
+
+    def test_one_rep_per_incomplete_cell(self):
+        single = [{"fact": "grasses", "q": "q", "steps": [{"severity": 0}]}]
+        wave1, wave2 = caveat_wave_plan({}, 3, "m", instructions=self.INSTR, ladders=single)
+        self.assertEqual(wave1, [encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 0)])
+        self.assertEqual(wave2, [encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 1),
+                                  encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 2)])
+
+    def test_resumes_from_already_count(self):
+        single = [{"fact": "grasses", "q": "q", "steps": [{"severity": 0}]}]
+        done = {("m", "SOURCE_EXCLUSIVE", "grasses", 0): 2}
+        wave1, wave2 = caveat_wave_plan(done, 5, "m", instructions=self.INSTR, ladders=single)
+        self.assertEqual(wave1, [encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 2)])
+        self.assertEqual(wave2, [encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 3),
+                                  encode_caveat_custom_id("grasses", 0, "SOURCE_EXCLUSIVE", 4)])
+
+    def test_matches_cell_granularity_on_real_data(self):
+        wave1, wave2 = caveat_wave_plan({}, 1, "claude-sonnet-5")
+        self.assertEqual(len(wave1), total_cells() // len(MODELS))
+        self.assertEqual(wave2, [])
+
+
+class TestAbstentionWavePlan(unittest.TestCase):
+    INSTR = [("SOURCE_EXCLUSIVE", "sys")]
+    ITEMS = [{"item_id": "a"}, {"item_id": "b"}]
+
+    def test_one_warm_call_per_instruction_on_real_data(self):
+        wave1, wave2 = abstention_wave_plan({}, 1, "claude-sonnet-5")
+        self.assertEqual(len(wave1), len(SYSTEM_INSTRUCTIONS))
+        self.assertEqual(len(wave2), len(UNANSWERABLE_ITEMS) * len(SYSTEM_INSTRUCTIONS) - len(SYSTEM_INSTRUCTIONS))
+
+    def test_warm_item_is_first_pending_item(self):
+        done = {("m", "SOURCE_EXCLUSIVE", "a"): 1}
+        wave1, wave2 = abstention_wave_plan(done, 1, "m", instructions=self.INSTR, items=self.ITEMS)
+        self.assertEqual(wave1, [encode_abstention_custom_id("b", "SOURCE_EXCLUSIVE", 0)])
+
+    def test_skips_fully_done_instruction(self):
+        done = {("m", "SOURCE_EXCLUSIVE", "a"): 1, ("m", "SOURCE_EXCLUSIVE", "b"): 1}
+        wave1, wave2 = abstention_wave_plan(done, 1, "m", instructions=self.INSTR, items=self.ITEMS)
+        self.assertEqual((wave1, wave2), ([], []))
+
+    def test_second_rep_of_warm_item_goes_to_wave2(self):
+        wave1, wave2 = abstention_wave_plan({}, 2, "m", instructions=self.INSTR, items=self.ITEMS)
+        self.assertEqual(wave1, [encode_abstention_custom_id("a", "SOURCE_EXCLUSIVE", 0)])
+        self.assertIn(encode_abstention_custom_id("a", "SOURCE_EXCLUSIVE", 1), wave2)
+
+
+class TestBuildBatchMessageParams(unittest.TestCase):
+    def test_cache_control_only_on_passage(self):
+        params = build_batch_message_params("claude-sonnet-5", "sys", "q?", "DOC")
+        content = params["messages"][0]["content"]
+        self.assertEqual(content[0]["cache_control"], {"type": "ephemeral", "ttl": "1h"})
+        self.assertNotIn("cache_control", content[1])
+
+    def test_blocks_concatenate_to_sync_prompt(self):
+        params = build_batch_message_params("claude-sonnet-5", "sys", "q?", "DOC")
+        content = params["messages"][0]["content"]
+        self.assertEqual(content[0]["text"] + content[1]["text"], "Passage:\nDOC\n\nQuestion: q?")
 
 
 if __name__ == "__main__":

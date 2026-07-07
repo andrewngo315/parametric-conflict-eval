@@ -22,9 +22,9 @@ WEAK_GROUNDING: "Base your answer on the passage provided."
 
 ## Findings so far
 
-- Under SOURCE_EXCLUSIVE (the standard strict-grounding RAG system instruction), error-flagging is zero at every severity. Both models repeat physically impossible values (500-metre grass, one toilet per 1,000,000 workers) without comment.
-- Under FLAG_INVITING, flagging only switches on at roughly 100x errors; perturbations up to 25x pass unflagged. False positives on correct values: zero. Under WEAK_GROUNDING (no invitation to flag), flagging is zero at every severity -- the skepticism is elicited by the invitation, not present by default.
-- The weak models' failure mode is silence, not false endorsements: zero endorsements in 1,728 answers from GPT-4o-mini and GPT-5.4-nano across all three instructions. Fluent false verification has so far only been observed informally in frontier models.
+- Under SOURCE_EXCLUSIVE (a standard strict-grounding RAG system instruction), faithfulness rates are 100% across all tested models, but the error-flagging rate is zero at every severity, a clear trade-off. All models repeat physically impossible values (500-metre grass, one toilet per 1,000,000 workers) without comment under this system instruction.
+- The WEAK_GROUNDING instruction is very ineffective with no model achieving an average error-flagging OR faithfulness rate of over 50%.
+- Claude Sonnet 5 on the FLAG_INVITING instruction has the highest observed balance of error-flagging and faithfulness rates but is extremely prone to false endorsements. On the other hand, the older GPT models tested on the FLAG_INVITING instruction did not generate any false endorsements at all at the cost of significantly lower error-flagging rates. This provides an early indication that false endorsements are a new behaviour in frontier models. 
 
 Full tables, confidence intervals, raw examples and limitations: [results.md](results.md). Complete per-cell grids: `caveat_curve.csv` / `abstention_curve.csv`.
 
@@ -32,7 +32,7 @@ Full tables, confidence intervals, raw examples and limitations: [results.md](re
 
 ```
 pip install -r requirements.txt
-cp .env.example .env        # add OPENAI_API_KEY (and ANTHROPIC_API_KEY for Anthropic candidates)
+cp .env.example .env        # add OPENAI_API_KEY and ANTHROPIC_API_KEY -- the default MODELS roster in config.py includes both providers
 python3 harness.py          # dry-run: prints the full design + call-count estimate, costs nothing
 ```
 
@@ -54,7 +54,7 @@ The benchmark can be customised in `config.py`, including models tested, samples
 
 ## Why trust the numbers
 
-Every answer is scored by an LLM judge, and no judge scores anything before being certified against a human-labelled gold set with a zero-tolerance anchor check (obvious cases must all be judged correctly) plus a Cohen's kappa threshold >= 0.80 against the human labels. Current certifications: caveat judge kappa 0.97 (3-class, 45-row gold), abstention judge kappa 1.00 (22-row gold). 
+Every answer is scored by an LLM judge, and no judge scores anything before being certified against a human-labelled gold set with a zero-tolerance anchor check (obvious cases must all be judged correctly) plus a Cohen's kappa threshold >= 0.80 against the human labels. Current certifications: caveat judge kappa 0.97 (3-class, 56-row gold), abstention judge kappa 1.00 (22-row gold). 
 
 ## Repo map
 
@@ -63,10 +63,11 @@ Every answer is scored by an LLM judge, and no judge scores anything before bein
 | `config.py` | every customisable setting and shared functions |
 | `harness.py` | the two experiments |
 | `judge.py` | both judges and their certification pipeline |
-| `test_logic.py` | 73 offline tests verifying the functions |
+| `test_logic.py` | 87 offline tests verifying the functions |
 | `document.txt` | the source document (currently a NSW development consent) |
 | `caveat_gold.json` / `abstention_gold.json` | human-labelled gold sets the judges are certified against |
 | `results.md` + `*_curve.csv` | published findings and their full grids |
+| `plot_tradeoff.py` + `tradeoff_scatter.png` | the trade-off scatter plot in results.md and its generator |
 
 ## Status / limitations
 

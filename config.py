@@ -1,12 +1,14 @@
 import anthropic
 import re
 import time
+from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+from anthropic.types.messages.batch_create_params import Request
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-MODELS = [("gpt-4o-mini", "openai"), ("gpt-5.4-nano", "openai")]
+MODELS = [("gpt-4o-mini", "openai"), ("gpt-5.4-nano", "openai"), ("claude-sonnet-5", "anthropic")]
 JUDGE_MODEL = "gpt-5.4-mini"  # LLM judge, ideally from a different model provider to the candidate model
 GOLD_CANDIDATE = ("claude-sonnet-5", "anthropic") # Model to be used for generating answers in the gold set
 N_PER_CELL = 8
@@ -96,3 +98,39 @@ def appears(phrase, text):
 
 def step_doc(step):
     return perturb(passage, step["replace"]) if step["replace"] else passage
+
+def build_batch_message_params(model, system_instruction, question, doc, max_tokens=1200, cache_ttl="1h"):
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system_instruction,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Passage:\n" + doc,
+                 "cache_control": {"type": "ephemeral", "ttl": cache_ttl}},
+                {"type": "text", "text": "\n\nQuestion: " + question},
+            ],
+        }],
+    }
+
+def extract_anthropic_text(message):
+    return "".join(b.text for b in message.content if b.type == "text")
+
+def submit_anthropic_batch(requests):
+    reqs = [Request(custom_id=cid, params=MessageCreateParamsNonStreaming(**params)) for cid, params in requests]
+    batch = with_retry(lambda: anthropic_client().messages.batches.create(requests=reqs))
+    return batch.id
+
+def poll_anthropic_batch(batch_id, poll_interval=30, on_poll=None):
+    while True:
+        batch = with_retry(lambda: anthropic_client().messages.batches.retrieve(batch_id))
+        if on_poll:
+            on_poll(batch)
+        if batch.processing_status == "ended":
+            return batch
+        time.sleep(poll_interval)
+
+def anthropic_batch_results(batch_id):
+    for r in anthropic_client().messages.batches.results(batch_id):
+        yield r.custom_id, r.result

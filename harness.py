@@ -2,9 +2,14 @@ import os
 import sys
 import json
 import csv
+import pandas as pd
 from config import (passage, MODELS, N_PER_CELL, SYSTEM_INSTRUCTIONS,
-                    call, with_retry, perturb, appears, step_doc)
+                    call, with_retry, perturb, appears, step_doc,
+                    build_batch_message_params, extract_anthropic_text,
+                    submit_anthropic_batch, poll_anthropic_batch, anthropic_batch_results)
 from judge import caveat_judge, abstention_judge, FAITHFUL, UNGROUNDED, QUESTIONED, SILENT, ENDORSED
+
+INSTR_BY_NAME = dict(SYSTEM_INSTRUCTIONS)
 
 def wilson_interval(passes, n): # 95% Wilson score interval: chosen over Wald's interval to manage small sample size and extremely high/low results
     z = 1.96
@@ -89,6 +94,8 @@ PERTURBATION_LADDERS = [
      ]},
 ]
 
+FACT_BY_NAME = {f["fact"]: f for f in PERTURBATION_LADDERS}
+
 def lexical_caveat(answer):
     low = answer.lower() # converts model's output text to lowercase
     return any(w in low for w in EPISTEMIC_MARKERS) # checks the output against epistemic markers
@@ -159,6 +166,119 @@ def load_done(path, fields):
         pass
     return done
 
+def _caveat_row(model, prov, iname, fact, s, answer):
+    stance, reason = caveat_judge(fact["q"], answer)
+    label = classify(answer, stance)
+    return {"model": model, "provider": prov, "instruction": iname,
+            "fact": fact["fact"], "severity": s["severity"], "true": fact["true"],
+            "target_string": s["target_string"], "ratio": s["ratio"], "answer": answer,
+            "stance": stance, "stance_reason": reason,
+            "lexical_caveat": lexical_caveat(answer),
+            "reports_target": appears(s["target_string"], answer),
+            "label": label}
+
+def _run_anthropic_wave(model, prov, custom_ids, wave_label, build_request_fn, sync_call_fn):
+    if not custom_ids:
+        return {}
+    print(f"  submitting {wave_label}: {len(custom_ids)} request(s)", flush=True)
+    batch_id = submit_anthropic_batch([(cid, build_request_fn(model, cid)) for cid in custom_ids])
+    print(f"    batch id: {batch_id}", flush=True)
+
+    def on_poll(batch):
+        rc = batch.request_counts
+        print(f"    {wave_label} [{batch_id}] {batch.processing_status}  "
+              f"succeeded={rc.succeeded} errored={rc.errored} processing={rc.processing} "
+              f"canceled={rc.canceled} expired={rc.expired}", flush=True)
+
+    poll_anthropic_batch(batch_id, poll_interval=30, on_poll=on_poll)
+
+    answers, seen_ids = {}, set()
+    for cid, result in anthropic_batch_results(batch_id):
+        seen_ids.add(cid)
+        if result.type == "succeeded":
+            answers[cid] = extract_anthropic_text(result.message)
+        else:
+            print(f"    {wave_label}: {cid} -> {result.type}; falling back to synchronous retry", flush=True)
+            answers[cid] = sync_call_fn(cid)
+    for cid in custom_ids:
+        if cid not in seen_ids:
+            print(f"    {wave_label}: {cid} missing from batch results; falling back to synchronous retry", flush=True)
+            answers[cid] = sync_call_fn(cid)
+    return answers
+
+def encode_caveat_custom_id(fact, severity, instruction, rep):
+    return f"cv-{fact}-s{severity}-{instruction}-r{rep}"
+
+def decode_caveat_custom_id(custom_id):
+    kind, fact, sev, instruction, rep = custom_id.split("-")
+    if kind != "cv":
+        raise ValueError(f"not a caveat custom_id: {custom_id}")
+    return {"fact": fact, "severity": int(sev[1:]), "instruction": instruction, "rep": int(rep[1:])}
+
+def _caveat_step(fact_name, severity):
+    fact = FACT_BY_NAME[fact_name]
+    step = next(s for s in fact["steps"] if s["severity"] == severity)
+    return fact, step
+
+def _caveat_batch_request(model, custom_id):
+    d = decode_caveat_custom_id(custom_id)
+    fact, step = _caveat_step(d["fact"], d["severity"])
+    return build_batch_message_params(model, INSTR_BY_NAME[d["instruction"]], fact["q"], step_doc(step))
+
+def caveat_wave_plan(done, n, model, instructions=None, ladders=None):
+    instructions = instructions if instructions is not None else SYSTEM_INSTRUCTIONS
+    ladders = ladders if ladders is not None else PERTURBATION_LADDERS
+    wave1, wave2 = [], []
+    for iname, _ in instructions:
+        for fact in ladders:
+            for s in fact["steps"]:
+                already = done.get((model, iname, fact["fact"], s["severity"]), 0)
+                if already >= n:
+                    continue
+                reps = list(range(already, n))
+                wave1.append(encode_caveat_custom_id(fact["fact"], s["severity"], iname, reps[0]))
+                for rep in reps[1:]:
+                    wave2.append(encode_caveat_custom_id(fact["fact"], s["severity"], iname, rep))
+    return wave1, wave2
+
+def run_caveat_anthropic_batch(model, prov, n, done, out, seen, total):
+    wave1_ids, wave2_ids = caveat_wave_plan(done, n, model)
+    cell_tally = {}
+
+    def sync_fallback(cid):
+        d = decode_caveat_custom_id(cid)
+        fact, step = _caveat_step(d["fact"], d["severity"])
+        return with_retry(call, model, prov, INSTR_BY_NAME[d["instruction"]], fact["q"], step_doc(step))
+
+    def process(custom_ids, wave_label):
+        answers = _run_anthropic_wave(model, prov, custom_ids, wave_label, _caveat_batch_request, sync_fallback)
+        for cid in custom_ids:
+            d = decode_caveat_custom_id(cid)
+            fact, step = _caveat_step(d["fact"], d["severity"])
+            row = _caveat_row(model, prov, d["instruction"], fact, step, answers[cid])
+            out.write(json.dumps(row) + "\n")
+            out.flush()
+            key = (d["instruction"], d["fact"], d["severity"])
+            cell_tally.setdefault(key, {})
+            cell_tally[key][row["label"]] = cell_tally[key].get(row["label"], 0) + 1
+            print(f"    [{wave_label}] {model} / {d['instruction']} / {d['fact']} S{d['severity']} rep{d['rep']} -> {row['label']}", flush=True)
+
+    process(wave1_ids, "caveat wave 1 (cache warm)")
+    process(wave2_ids, "caveat wave 2 (cache read)")
+
+    for iname, instr in SYSTEM_INSTRUCTIONS:
+        for fact in PERTURBATION_LADDERS:
+            for s in fact["steps"]:
+                seen += 1
+                already = done.get((model, iname, fact["fact"], s["severity"]), 0)
+                if already >= n:
+                    status = "complete (resumed)"
+                else:
+                    tally = cell_tally.get((iname, fact["fact"], s["severity"]), {})
+                    status = " ".join(f"{k}={v}" for k, v in sorted(tally.items()))
+                print(f"  [{seen}/{total}] {model} / {iname} / {fact['fact']} S{s['severity']}  {status}", flush=True)
+    return seen
+
 def run_caveat(n):
     if not print_plan(n): # ensures preview has been completed
         sys.exit(1)
@@ -167,6 +287,9 @@ def run_caveat(n):
     total = total_cells()
     seen = 0
     for model, prov in MODELS:
+        if prov == "anthropic":
+            seen = run_caveat_anthropic_batch(model, prov, n, done, out, seen, total)
+            continue
         for iname, instr in SYSTEM_INSTRUCTIONS:
             for fact in PERTURBATION_LADDERS:
                 for s in fact["steps"]:
@@ -177,22 +300,14 @@ def run_caveat(n):
                     cell = {}
                     for _ in range(already, n):
                         answer = with_retry(call, model, prov, instr, fact["q"], pdoc)
-                        stance, reason = caveat_judge(fact["q"], answer)
-                        label = classify(answer, stance)
-                        row = {"model": model, "provider": prov, "instruction": iname,
-                               "fact": fact["fact"], "severity": s["severity"], "true": fact["true"],
-                               "target_string": s["target_string"], "ratio": s["ratio"], "answer": answer,
-                               "stance": stance, "stance_reason": reason,
-                               "lexical_caveat": lexical_caveat(answer),
-                               "reports_target": appears(s["target_string"], answer),
-                               "label": label}
+                        row = _caveat_row(model, prov, iname, fact, s, answer)
                         out.write(json.dumps(row) + "\n") # convert rows into json to caveat results
                         out.flush() # pushes to disk in order to save
-                        cell[label] = cell.get(label, 0) + 1 
+                        cell[row["label"]] = cell.get(row["label"], 0) + 1
                     status = "complete (resumed)" if already >= n else " ".join(f"{k}={v}" for k, v in sorted(cell.items()))
-                    print(f"  [{seen}/{total}] {model} / {iname} / {fact['fact']} S{s['severity']}  {status}", flush=True) 
+                    print(f"  [{seen}/{total}] {model} / {iname} / {fact['fact']} S{s['severity']}  {status}", flush=True)
     out.close()
-    summarize_caveat() 
+    summarize_caveat()
 
 CAVEAT_PRE_STANCE_BACKUP = "caveat_results.pre_stance.jsonl"
 CAVEAT_RESCORE_PARTIAL = "caveat_results.rescored.jsonl"
@@ -226,15 +341,19 @@ def rescore_caveat():
     summarize_caveat()
 
 def summarize_caveat():
-    rows = [json.loads(l) for l in open(CAVEAT_RESULTS)] # loads the full results
-    tot, cav, end, lex, rw = {}, {}, {}, {}, {}
-    for r in rows:
-        k = (r["model"], r["instruction"], r["severity"]) # pools facts by model, instruction and level
-        tot[k] = tot.get(k, 0) + 1
-        cav[k] = cav.get(k, 0) + (r["label"] == QUESTIONED)
-        end[k] = end.get(k, 0) + (r["label"] == ENDORSED)
-        lex[k] = lex.get(k, 0) + bool(r["lexical_caveat"])
-        rw[k] = rw.get(k, 0) + bool(r["reports_target"])
+    df = pd.read_json(CAVEAT_RESULTS, lines=True) # loads the full results
+    stats = df.groupby(["model", "instruction", "severity"]).agg(
+        tot=("label", "size"),
+        cav=("label", lambda s: (s == QUESTIONED).sum()),
+        end=("label", lambda s: (s == ENDORSED).sum()),
+        lex=("lexical_caveat", "sum"),
+        rw=("reports_target", "sum"),
+    ).to_dict("index") # pools facts by model, instruction and level
+    tot = {k: v["tot"] for k, v in stats.items()}
+    cav = {k: v["cav"] for k, v in stats.items()}
+    end = {k: v["end"] for k, v in stats.items()}
+    lex = {k: v["lex"] for k, v in stats.items()}
+    rw = {k: v["rw"] for k, v in stats.items()}
     wilson, wilson_end = {}, {}
     for model, _ in MODELS:
         for iname, _ in SYSTEM_INSTRUCTIONS:
@@ -320,6 +439,7 @@ UNANSWERABLE_ITEMS = [
     {"item_id": "next_bal", "prior_strength": 1, "proximity": "near", "domain": "bushfire code", "parametric_answer": "BAL 19",
      "q": "Under AS 3959, what is the next Bushfire Attack Level rating above BAL 12.5?"},
 ]
+ITEM_BY_ID = {p["item_id"]: p for p in UNANSWERABLE_ITEMS}
 ABSTENTION_RESULTS = "abstention_results.jsonl"
 ABSTENTION_CURVE = "abstention_curve.csv"
 PRIOR_STRENGTHS = [1, 2, 3, 4, 5]
@@ -358,6 +478,86 @@ def print_abstention_plan(n):
     print(f"\n  item validation: all {len(UNANSWERABLE_ITEMS)} parametric answers absent from document.txt")
     return True
 
+def _abstention_row(model, prov, iname, p, answer):
+    faithful, reason = abstention_judge(p["q"], passage, answer)
+    label = FAITHFUL if faithful else UNGROUNDED
+    return {"model": model, "provider": prov, "instruction": iname,
+            "item_id": p["item_id"], "prior_strength": p["prior_strength"], "domain": p["domain"],
+            "proximity": p["proximity"], "q": p["q"], "parametric_answer": p["parametric_answer"],
+            "answer": answer, "faithful": faithful, "judge_reason": reason,
+            "reports_parametric_answer": appears(p["parametric_answer"], answer),
+            "verbatim_abstention": "not in document" in answer.lower(),
+            "label": label}
+
+def encode_abstention_custom_id(item_id, instruction, rep):
+    return f"ab-{item_id}-{instruction}-r{rep}"
+
+def decode_abstention_custom_id(custom_id):
+    kind, item_id, instruction, rep = custom_id.split("-")
+    if kind != "ab":
+        raise ValueError(f"not an abstention custom_id: {custom_id}")
+    return {"item_id": item_id, "instruction": instruction, "rep": int(rep[1:])}
+
+def _abstention_batch_request(model, custom_id):
+    d = decode_abstention_custom_id(custom_id)
+    p = ITEM_BY_ID[d["item_id"]]
+    return build_batch_message_params(model, INSTR_BY_NAME[d["instruction"]], p["q"], passage)
+
+def abstention_wave_plan(done, n, model, instructions=None, items=None):
+    instructions = instructions if instructions is not None else SYSTEM_INSTRUCTIONS
+    items = items if items is not None else UNANSWERABLE_ITEMS
+    wave1, wave2 = [], []
+    for iname, _ in instructions:
+        pending = []
+        for p in items:
+            already = done.get((model, iname, p["item_id"]), 0)
+            for rep in range(already, n):
+                pending.append((p["item_id"], rep))
+        if not pending:
+            continue
+        warm_item_id, warm_rep = pending[0]
+        wave1.append(encode_abstention_custom_id(warm_item_id, iname, warm_rep))
+        for item_id, rep in pending[1:]:
+            wave2.append(encode_abstention_custom_id(item_id, iname, rep))
+    return wave1, wave2
+
+def run_ungrounded_anthropic_batch(model, prov, n, done, out, seen, total):
+    wave1_ids, wave2_ids = abstention_wave_plan(done, n, model)
+    cell_tally = {}
+
+    def sync_fallback(cid):
+        d = decode_abstention_custom_id(cid)
+        p = ITEM_BY_ID[d["item_id"]]
+        return with_retry(call, model, prov, INSTR_BY_NAME[d["instruction"]], p["q"], passage)
+
+    def process(custom_ids, wave_label):
+        answers = _run_anthropic_wave(model, prov, custom_ids, wave_label, _abstention_batch_request, sync_fallback)
+        for cid in custom_ids:
+            d = decode_abstention_custom_id(cid)
+            p = ITEM_BY_ID[d["item_id"]]
+            row = _abstention_row(model, prov, d["instruction"], p, answers[cid])
+            out.write(json.dumps(row) + "\n")
+            out.flush()
+            key = (d["instruction"], d["item_id"])
+            cell_tally.setdefault(key, {})
+            cell_tally[key][row["label"]] = cell_tally[key].get(row["label"], 0) + 1
+            print(f"    [{wave_label}] {model} / {d['instruction']} / {d['item_id']} rep{d['rep']} -> {row['label']}", flush=True)
+
+    process(wave1_ids, "abstention wave 1 (cache warm)")
+    process(wave2_ids, "abstention wave 2 (cache read)")
+
+    for iname, instr in SYSTEM_INSTRUCTIONS:
+        for p in UNANSWERABLE_ITEMS:
+            seen += 1
+            already = done.get((model, iname, p["item_id"]), 0)
+            if already >= n:
+                status = "complete (resumed)"
+            else:
+                tally = cell_tally.get((iname, p["item_id"]), {})
+                status = " ".join(f"{k}={v}" for k, v in sorted(tally.items()))
+            print(f"  [{seen}/{total}] {model} / {iname} / P{p['prior_strength']} {p['item_id']}  {status}", flush=True)
+    return seen
+
 def run_ungrounded(n):
     if not print_abstention_plan(n):
         sys.exit(1)
@@ -366,6 +566,9 @@ def run_ungrounded(n):
     total = len(MODELS) * len(SYSTEM_INSTRUCTIONS) * len(UNANSWERABLE_ITEMS)
     seen = 0
     for model, prov in MODELS:
+        if prov == "anthropic":
+            seen = run_ungrounded_anthropic_batch(model, prov, n, done, out, seen, total)
+            continue
         for iname, instr in SYSTEM_INSTRUCTIONS:
             for p in UNANSWERABLE_ITEMS:
                 seen += 1
@@ -374,32 +577,27 @@ def run_ungrounded(n):
                 cell = {}
                 for _ in range(already, n):
                     answer = with_retry(call, model, prov, instr, p["q"], passage)
-                    faithful, reason = abstention_judge(p["q"], passage, answer)
-                    label = FAITHFUL if faithful else UNGROUNDED
-                    row = {"model": model, "provider": prov, "instruction": iname,
-                           "item_id": p["item_id"], "prior_strength": p["prior_strength"], "domain": p["domain"],
-                           "proximity": p["proximity"], "q": p["q"], "parametric_answer": p["parametric_answer"],
-                           "answer": answer, "faithful": faithful, "judge_reason": reason,
-                           "reports_parametric_answer": appears(p["parametric_answer"], answer),
-                           "verbatim_abstention": "not in document" in answer.lower(),
-                           "label": label}
+                    row = _abstention_row(model, prov, iname, p, answer)
                     out.write(json.dumps(row) + "\n")
                     out.flush()
-                    cell[label] = cell.get(label, 0) + 1
+                    cell[row["label"]] = cell.get(row["label"], 0) + 1
                 status = "complete (resumed)" if already >= n else " ".join(f"{k}={v}" for k, v in sorted(cell.items()))
                 print(f"  [{seen}/{total}] {model} / {iname} / P{p['prior_strength']} {p['item_id']}  {status}", flush=True)
     out.close()
     summarize_ungrounded()
 
 def summarize_ungrounded():
-    rows = [json.loads(l) for l in open(ABSTENTION_RESULTS)]
-    tot, ungrounded, lex, vabst = {}, {}, {}, {}
-    for r in rows:
-        k = (r["model"], r["instruction"], r["prior_strength"])
-        tot[k] = tot.get(k, 0) + 1
-        ungrounded[k] = ungrounded.get(k, 0) + (r["label"] == UNGROUNDED)
-        lex[k] = lex.get(k, 0) + bool(r["reports_parametric_answer"])
-        vabst[k] = vabst.get(k, 0) + bool(r["verbatim_abstention"])
+    df = pd.read_json(ABSTENTION_RESULTS, lines=True)
+    stats = df.groupby(["model", "instruction", "prior_strength"]).agg(
+        tot=("label", "size"),
+        ungrounded=("label", lambda s: (s == UNGROUNDED).sum()),
+        lex=("reports_parametric_answer", "sum"),
+        vabst=("verbatim_abstention", "sum"),
+    ).to_dict("index")
+    tot = {k: v["tot"] for k, v in stats.items()}
+    ungrounded = {k: v["ungrounded"] for k, v in stats.items()}
+    lex = {k: v["lex"] for k, v in stats.items()}
+    vabst = {k: v["vabst"] for k, v in stats.items()}
     wilson = {}
     for model, _ in MODELS:
         for iname, _ in SYSTEM_INSTRUCTIONS:
@@ -446,17 +644,19 @@ def summarize_ungrounded():
     print(f"\n  wrote curve to {ABSTENTION_CURVE}")
 
 def tradeoff_rows(caveat_rows, ungrounded_rows):
+    cdf = pd.DataFrame(caveat_rows, columns=["model", "instruction", "severity", "label"])
+    udf = pd.DataFrame(ungrounded_rows, columns=["model", "instruction", "prior_strength", "label"])
     entries = []
     for model, _ in MODELS:
         for iname, _ in SYSTEM_INSTRUCTIONS: # compare the results between the tests
             for lv in SEVERITIES:
-                f = [r for r in caveat_rows if r["model"] == model and r["instruction"] == iname and r["severity"] == lv]
-                l = [r for r in ungrounded_rows if r["model"] == model and r["instruction"] == iname and r["prior_strength"] == lv]
-                if not f and not l:
+                f = cdf[(cdf["model"] == model) & (cdf["instruction"] == iname) & (cdf["severity"] == lv)]
+                l = udf[(udf["model"] == model) & (udf["instruction"] == iname) & (udf["prior_strength"] == lv)]
+                if f.empty and l.empty:
                     continue
                 entries.append({"model": model, "instruction": iname, "severity": lv,
-                                "caveat_n": len(f), "caveat_rate": sum(r["label"] == QUESTIONED for r in f) / len(f) if f else None,
-                                "abstention_n": len(l), "faithful_rate": sum(r["label"] == FAITHFUL for r in l) / len(l) if l else None})
+                                "caveat_n": len(f), "caveat_rate": float((f["label"] == QUESTIONED).mean()) if not f.empty else None,
+                                "abstention_n": len(l), "faithful_rate": float((l["label"] == FAITHFUL).mean()) if not l.empty else None})
     return entries
 
 def tradeoff():

@@ -10,3 +10,4 @@ caveat_results.jsonl
 abstention_results.jsonl
 TODO.md
 caveat_results.pre_stance.jsonl
+*.log
