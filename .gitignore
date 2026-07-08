@@ -6,8 +6,6 @@ archive/
 abstention_judge_results.json
 caveat_judge_results.json
 discriminate_results.jsonl
-caveat_results.jsonl
-abstention_results.jsonl
 TODO.md
 caveat_results.pre_stance.jsonl
 caveat_results.pre_rescore.jsonl
