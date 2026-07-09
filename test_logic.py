@@ -12,7 +12,7 @@ from config import (perturb, with_retry, DOCUMENTS, doc_text, openai_reasoning, 
 from harness import (wilson_interval, PERTURBATION_LADDERS, SEVERITIES, validate_ladders,
                      total_steps, total_cells, classify, lexical_caveat, UNANSWERABLE_ITEMS, validate_items,
                      load_done, tradeoff_rows, PRIOR_STRENGTHS, cluster_icc, vector_cells,
-                     probe_targets, _probe_row,
+                     probe_targets, _probe_row, probe_item_rates, measured_prior_bins, prior_bin, prior_bin_label,
                      encode_caveat_custom_id, decode_caveat_custom_id,
                      encode_abstention_custom_id, decode_abstention_custom_id,
                      caveat_wave_plan, abstention_wave_plan, concurrent_map)
@@ -257,6 +257,53 @@ class TestClusterIcc(unittest.TestCase):
         p, rho, neff = cluster_icc([(1, 8), (0, 8), (0, 8), (0, 8), (1, 8), (0, 8)])
         self.assertEqual(rho, 0.0)
         self.assertAlmostEqual(neff, 48.0)
+
+
+class TestMeasuredPriorBins(unittest.TestCase):
+    def test_no_probe_file_yields_no_bins(self):
+        with mock.patch("harness.PROBE_RESULTS", "no_such_probe_file.jsonl"):
+            self.assertEqual(probe_item_rates(), {})
+            self.assertEqual(measured_prior_bins(), {})
+
+    def test_partial_probe_coverage_yields_no_bins(self):
+        with mock.patch("harness.probe_item_rates", return_value={"water_boil": 1.0}):
+            self.assertEqual(measured_prior_bins(), {})
+
+    def test_fixed_edges_do_not_move_with_the_sample(self):
+        self.assertEqual(prior_bin(0.0), 0)
+        self.assertEqual(prior_bin(0.24), 0)
+        self.assertEqual(prior_bin(0.25), 1)
+        self.assertEqual(prior_bin(0.5), 2)
+        self.assertEqual(prior_bin(0.75), 3)
+        self.assertEqual(prior_bin(1.0), 3)
+        self.assertEqual(prior_bin_label(0), "0.00-0.25")
+        self.assertEqual(prior_bin_label(3), "0.75-1.00")
+
+    def test_lopsided_sample_yields_lopsided_bins(self):
+        rates = {p["item_id"]: 0.9 for p in UNANSWERABLE_ITEMS}
+        with mock.patch("harness.probe_item_rates", return_value=rates):
+            bins = measured_prior_bins()
+        self.assertEqual(len(bins), 20)
+        self.assertEqual({b for b, _ in bins.values()}, {3})
+
+    def test_even_spread_lands_five_per_bin(self):
+        rates = {p["item_id"]: i / 19 for i, p in enumerate(UNANSWERABLE_ITEMS)}
+        with mock.patch("harness.probe_item_rates", return_value=rates):
+            bins = measured_prior_bins()
+        counts = {}
+        for b, label in bins.values():
+            counts[b] = counts.get(b, 0) + 1
+        self.assertEqual(counts, {0: 5, 1: 5, 2: 5, 3: 5})
+
+    def test_rates_pool_reps_and_models(self):
+        rows = [{"kind": "item", "name": "x", "reports_expected": True},
+                {"kind": "item", "name": "x", "reports_expected": False},
+                {"kind": "fact", "name": "y", "reports_expected": True}]
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        with mock.patch("harness.PROBE_RESULTS", f.name):
+            self.assertEqual(probe_item_rates(), {"x": 0.5})
 
 
 class TestEffortConvention(unittest.TestCase):

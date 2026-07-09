@@ -946,10 +946,69 @@ def summarize_probe():
     for (kind, name), v in sorted(by_target.items(), key=lambda kv: (kv[1]["rating"] is None, kv[1]["rating"], kv[0])):
         rating = "--" if v["rating"] is None else f"P{v['rating']}"
         print(f"  {rating:>3}  {kind:<5} {name:<24} knows {v['knows']}/{v['n']}   dontknow {v['dontknow']}/{v['n']}")
+    for kind, total in (("item", len(UNANSWERABLE_ITEMS)), ("fact", len(PERTURBATION_LADDERS))):
+        rates = probe_rates(kind)
+        if not rates:
+            continue
+        occupancy = {b: 0 for b in range(len(PRIOR_BIN_EDGES) - 1)}
+        for r in rates.values():
+            occupancy[prior_bin(r)] += 1
+        target = total / len(occupancy)
+        cells = "  ".join(f"{prior_bin_label(b)}: {n_in}" for b, n_in in occupancy.items())
+        print(f"\n  {kind} spread across fixed knows-rate bins (authoring target ~{target:.0f} per bin): {cells}")
+        thin = [prior_bin_label(b) for b, n_in in occupancy.items() if n_in < target / 2]
+        if thin:
+            print(f"  THIN BINS {', '.join(thin)} -- author new {kind}s whose expected values land there before the main run")
+
+PRIOR_BIN_EDGES = [0.0, 0.25, 0.5, 0.75, 1.0]
+
+def prior_bin(rate):
+    for b in range(len(PRIOR_BIN_EDGES) - 2):
+        if rate < PRIOR_BIN_EDGES[b + 1]:
+            return b
+    return len(PRIOR_BIN_EDGES) - 2
+
+def prior_bin_label(b):
+    return f"{PRIOR_BIN_EDGES[b]:.2f}-{PRIOR_BIN_EDGES[b + 1]:.2f}"
+
+def probe_rates(kind):
+    try:
+        rows = [json.loads(l) for l in open(PROBE_RESULTS)]
+    except FileNotFoundError:
+        return {}
+    agg = {}
+    for r in rows:
+        if r["kind"] != kind:
+            continue
+        x, n = agg.get(r["name"], (0, 0))
+        agg[r["name"]] = (x + bool(r["reports_expected"]), n + 1)
+    return {name: x / n for name, (x, n) in agg.items()}
+
+def probe_item_rates():
+    return probe_rates("item")
+
+def measured_prior_bins():
+    rates = probe_item_rates()
+    if set(rates) != {p["item_id"] for p in UNANSWERABLE_ITEMS}:
+        return {}
+    return {name: (prior_bin(r), prior_bin_label(prior_bin(r))) for name, r in rates.items()}
 
 def summarize_ungrounded():
     df = pd.read_json(ABSTENTION_RESULTS, lines=True)
-    stats = df.groupby(["model", "instruction", "prior_strength"]).agg(
+    bins = measured_prior_bins()
+    if bins:
+        df["prior_level"] = df["item_id"].map(lambda i: bins[i][0])
+        levels = sorted({b for b, _ in bins.values()})
+        level_label = {b: lab for b, lab in bins.values()}
+        header = ("\nPARAMETRIC-LEAKAGE RATE vs MEASURED PRIOR  (judge; fixed bins of doc-free knows-rate "
+                  "from prior_probe_results.jsonl -- bin edges never move with the item set)")
+    else:
+        df["prior_level"] = df["prior_strength"]
+        levels = PRIOR_STRENGTHS
+        level_label = {pr: f"P{pr}" for pr in PRIOR_STRENGTHS}
+        header = ("\nPARAMETRIC-LEAKAGE RATE vs AUTHORED PRIOR LEVEL  (judge; 1=obscure .. 5=universal -- "
+                  "AUTHORED ratings, not measured; run 'python3 harness.py probe' to bin by measured prior)")
+    stats = df.groupby(["model", "instruction", "prior_level"]).agg(
         tot=("label", "size"),
         ungrounded=("label", lambda s: (s == UNGROUNDED).sum()),
         lex=("reports_parametric_answer", "sum"),
@@ -962,45 +1021,45 @@ def summarize_ungrounded():
     wilson = {}
     for model, _ in MODELS:
         for iname, _ in SYSTEM_INSTRUCTIONS:
-            for pr in PRIOR_STRENGTHS:
+            for pr in levels:
                 k = (model, iname, pr)
                 if tot.get(k):
                     wilson[k] = wilson_interval(ungrounded.get(k, 0), tot[k])
-    print("\nPARAMETRIC-LEAKAGE RATE vs PRIOR STRENGTH  (judge; prior strength 1=obscure .. 5=universal)")
+    print(header)
     for model, _ in MODELS:
         for iname, _ in SYSTEM_INSTRUCTIONS:
             cells = []
-            for pr in PRIOR_STRENGTHS:
+            for pr in levels:
                 k = (model, iname, pr)
                 if k in wilson:
                     p, lo, hi = wilson[k]
-                    cells.append(f"P{pr}={p:.2f}[{lo:.2f},{hi:.2f}]")
+                    cells.append(f"{level_label[pr]}={p:.2f}[{lo:.2f},{hi:.2f}]")
                 else:
-                    cells.append(f"P{pr}=--")
+                    cells.append(f"{level_label[pr]}=--")
             print("  " + f"{model} / {iname}".ljust(30) + "  " + "  ".join(cells))
-    print("\nPERMISSIVE - SOURCE_EXCLUSIVE and WEAK_GROUNDING - SOURCE_EXCLUSIVE parametric-leakage-rate gaps, per prior strength:")
+    print("\nPERMISSIVE - SOURCE_EXCLUSIVE and WEAK_GROUNDING - SOURCE_EXCLUSIVE parametric-leakage-rate gaps, per prior level:")
     for model, _ in MODELS:
         for gap_name in ("FLAG_INVITING", "WEAK_GROUNDING"):
             gaps = []
-            for pr in PRIOR_STRENGTHS:
+            for pr in levels:
                 ks, kg = (model, "SOURCE_EXCLUSIVE", pr), (model, gap_name, pr)
                 if tot.get(ks) and tot.get(kg):
-                    gaps.append(f"P{pr}={ungrounded.get(kg,0)/tot[kg] - ungrounded.get(ks,0)/tot[ks]:+.2f}")
+                    gaps.append(f"{level_label[pr]}={ungrounded.get(kg,0)/tot[kg] - ungrounded.get(ks,0)/tot[ks]:+.2f}")
                 else:
-                    gaps.append(f"P{pr}=--")
+                    gaps.append(f"{level_label[pr]}=--")
             print("  " + f"{model} {gap_name}-SOURCE_EXCLUSIVE".ljust(36) + "  " + "  ".join(gaps))
     with open(ABSTENTION_CURVE, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["model", "instruction", "prior_strength", "n", "ungrounded", "ungrounded_rate", "lo", "hi",
+        w.writerow(["model", "instruction", "prior_level", "n", "ungrounded", "ungrounded_rate", "lo", "hi",
                     "reports_parametric_answer_rate", "verbatim_abstention_rate"])
         for model, _ in MODELS:
             for iname, _ in SYSTEM_INSTRUCTIONS:
-                for pr in PRIOR_STRENGTHS:
+                for pr in levels:
                     k = (model, iname, pr)
                     if k not in wilson:
                         continue
                     p, lo, hi = wilson[k]
-                    w.writerow([model, iname, pr, tot[k], ungrounded.get(k, 0), f"{p:.4f}", f"{lo:.4f}",
+                    w.writerow([model, iname, level_label[pr], tot[k], ungrounded.get(k, 0), f"{p:.4f}", f"{lo:.4f}",
                                 f"{hi:.4f}", f"{lex.get(k,0)/tot[k]:.4f}", f"{vabst.get(k,0)/tot[k]:.4f}"])
     print(f"\n  wrote curve to {ABSTENTION_CURVE}")
 
