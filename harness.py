@@ -802,12 +802,68 @@ def tradeoff():
     print("  flagging = error-flagging rate at this perturbation severity (denominator includes abstentions)")
     print("  faithful = faithful rate (1 - parametric-leakage rate) at the matching prior-strength level")
     print("  S0 = unperturbed control: a flag at S0 is a false positive; it has no abstention counterpart")
+    print("  NOTE: the Sx/Px row pairing is layout only -- perturbation severity and prior strength are")
+    print("  unrelated ordinal scales that happen to share level numbers; do not read rows as matched conditions")
     for e in entries:
         fr = "--" if e["caveat_rate"] is None else f"{e['caveat_rate']:.2f} (n={e['caveat_n']})"
         ar = "--" if e["faithful_rate"] is None else f"{e['faithful_rate']:.2f} (n={e['abstention_n']})"
         print(f"  {e['model']:<24} {e['instruction']:<10}  S{e['severity']}  flagging {fr:>14}   faithful {ar:>14}")
 
-if __name__ == "__main__": # only run file if executed directly 
+def cluster_icc(counts):
+    m = len(counts)
+    N = sum(n for _, n in counts)
+    x = sum(xi for xi, _ in counts)
+    p = x / N
+    if m < 2 or x == 0 or x == N:
+        return p, None, None
+    msb = sum(n * (xi / n - p) ** 2 for xi, n in counts) / (m - 1)
+    msw = sum(xi * (n - xi) / n for xi, n in counts) / (N - m)
+    k0 = (N - sum(n * n for _, n in counts) / N) / (m - 1)
+    denom = msb + (k0 - 1) * msw
+    rho = 0.0 if denom <= 0 else max(0.0, min(1.0, (msb - msw) / denom))
+    return p, rho, N / (1 + (N / m - 1) * rho)
+
+def vector_cells(rows, unit_field, level_field, positive_label):
+    cells = {}
+    for r in rows:
+        key = (r["model"], r["instruction"], r[level_field])
+        per = cells.setdefault(key, {})
+        xi, n = per.get(r[unit_field], (0, 0))
+        per[r[unit_field]] = (xi + (r["label"] == positive_label), n + 1)
+    return cells
+
+def _print_vector_section(title, cells, level_prefix):
+    print(title)
+    for key in sorted(cells):
+        model, iname, lv = key
+        per = cells[key]
+        p, rho, neff = cluster_icc(list(per.values()))
+        vec = "  ".join(f"{u}:{xi}/{n}" for u, (xi, n) in sorted(per.items()))
+        tail = "" if rho is None else f"   ICC {rho:.2f}  n_eff {neff:.1f}"
+        print(f"  {model:<24} {iname:<30} {level_prefix}{lv}  rate {p:.2f}   {vec}{tail}")
+
+def vectors():
+    def load(path):
+        try:
+            return [json.loads(l) for l in open(path)]
+        except FileNotFoundError:
+            print(f"  no {path} yet")
+            return None
+    print("PER-UNIT VECTORS -- the fact/item, not the rep, is the experimental unit: reps within a unit are correlated")
+    print("  ICC = within-unit correlation (ANOVA method-of-moments); n_eff = design-effect-adjusted sample size")
+    print("  ICC is unidentifiable in all-zero/all-one cells; no ICC shown there")
+    print()
+    caveat_rows = load(CAVEAT_RESULTS)
+    if caveat_rows:
+        _print_vector_section("CAVEAT -- questioned x/n per fact, per model x instruction x severity",
+                              vector_cells(caveat_rows, "fact", "severity", QUESTIONED), "S")
+        print()
+    abstention_rows = load(ABSTENTION_RESULTS)
+    if abstention_rows:
+        _print_vector_section("ABSTENTION -- faithful x/n per item, per model x instruction x prior strength",
+                              vector_cells(abstention_rows, "item_id", "prior_strength", FAITHFUL), "P")
+
+if __name__ == "__main__": # only run file if executed directly
     args = sys.argv[1:] 
     if args and args[0] == "caveat": # if args and args[0] = if the first argument is caveat
         run_caveat(int(args[1]) if len(args) > 1 else N_PER_CELL)
@@ -815,12 +871,14 @@ if __name__ == "__main__": # only run file if executed directly
         run_ungrounded(int(args[1]) if len(args) > 1 else N_PER_CELL)
     elif args and args[0] == "tradeoff":
         tradeoff()
+    elif args and args[0] == "vectors":
+        vectors()
     elif args and args[0] == "rescore":
         rescore_caveat(args[1:] or None)
     elif args and args[0] == "endorsement":
         endorsement_breakdown()
     elif args and not args[0].isdigit():
-        print("usage: python3 harness.py [N] | caveat [N] | abstention [N] | rescore | endorsement | tradeoff")
+        print("usage: python3 harness.py [N] | caveat [N] | abstention [N] | rescore | endorsement | tradeoff | vectors")
         sys.exit(1)
     else:
         n = int(args[0]) if args else N_PER_CELL

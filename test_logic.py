@@ -11,7 +11,7 @@ from config import (perturb, with_retry, MODELS, FLAG_INVITING, SOURCE_EXCLUSIVE
                     appears, passage, step_doc, build_batch_message_params)
 from harness import (wilson_interval, PERTURBATION_LADDERS, SEVERITIES, validate_ladders,
                      total_steps, total_cells, classify, lexical_caveat, UNANSWERABLE_ITEMS, validate_items,
-                     load_done, tradeoff_rows, PRIOR_STRENGTHS,
+                     load_done, tradeoff_rows, PRIOR_STRENGTHS, cluster_icc, vector_cells,
                      encode_caveat_custom_id, decode_caveat_custom_id,
                      encode_abstention_custom_id, decode_abstention_custom_id,
                      caveat_wave_plan, abstention_wave_plan, concurrent_map)
@@ -29,6 +29,10 @@ class TestPerturb(unittest.TestCase):
     def test_raises_on_noop(self):
         with self.assertRaises(AssertionError):
             perturb("nothing to change here", [("absent token", "x")]) # argument 1 is a phrase that doesn't exist in passage, thus nothing to replace, raising the assertion error for the perturb function
+
+    def test_raises_when_one_of_several_replacements_misses(self):
+        with self.assertRaises(AssertionError):
+            perturb("every 20 persons", [("every 20", "every 25"), ("part of 20 persons", "part of 25 persons")])
 
 
 class TestWilsonInterval(unittest.TestCase):
@@ -231,6 +235,40 @@ class TestInstructions(unittest.TestCase):
     def test_no_hyphens_in_instruction_names(self):
         for name, _ in SYSTEM_INSTRUCTIONS:
             self.assertNotIn("-", name)
+
+    def test_no_hyphens_in_fact_names(self):
+        for fact in PERTURBATION_LADDERS:
+            self.assertNotIn("-", fact["fact"])
+
+
+class TestClusterIcc(unittest.TestCase):
+    def test_all_or_nothing_clusters(self):
+        p, rho, neff = cluster_icc([(0, 8), (0, 8), (0, 8), (8, 8), (8, 8), (8, 8)])
+        self.assertEqual(p, 0.5)
+        self.assertEqual(rho, 1.0)
+        self.assertAlmostEqual(neff, 6.0)
+
+    def test_degenerate_cell_has_no_icc(self):
+        self.assertEqual(cluster_icc([(0, 8)] * 6), (0.0, None, None))
+        self.assertEqual(cluster_icc([(8, 8)] * 6), (1.0, None, None))
+
+    def test_uncorrelated_reps_keep_full_n(self):
+        p, rho, neff = cluster_icc([(1, 8), (0, 8), (0, 8), (0, 8), (1, 8), (0, 8)])
+        self.assertEqual(rho, 0.0)
+        self.assertAlmostEqual(neff, 48.0)
+
+
+class TestVectorCells(unittest.TestCase):
+    def test_groups_by_cell_and_unit(self):
+        rows = [
+            {"model": "m", "instruction": "i", "severity": 1, "fact": "a", "label": "questioned"},
+            {"model": "m", "instruction": "i", "severity": 1, "fact": "a", "label": "silent"},
+            {"model": "m", "instruction": "i", "severity": 1, "fact": "b", "label": "questioned"},
+            {"model": "m", "instruction": "i", "severity": 2, "fact": "a", "label": "questioned"},
+        ]
+        cells = vector_cells(rows, "fact", "severity", "questioned")
+        self.assertEqual(cells[("m", "i", 1)], {"a": (1, 2), "b": (1, 1)})
+        self.assertEqual(cells[("m", "i", 2)], {"a": (1, 1)})
 
 
 class TestConcurrentMap(unittest.TestCase):

@@ -12,7 +12,7 @@ load_dotenv()
 MODELS = [("gpt-4o-mini", "openai"), ("gpt-5.4-nano", "openai"), ("claude-sonnet-5", "anthropic")]
 JUDGE_MODEL = "gpt-5.4-mini"  # LLM judge, ideally from a different model provider to the candidate model
 GOLD_CANDIDATE = ("claude-sonnet-5", "anthropic") # Model to be used for generating answers in the gold set
-N_PER_CELL = 8
+N_PER_CELL = 4
 JUDGE_CONCURRENCY = 4
 
 passage = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "document.txt")).read()
@@ -92,6 +92,7 @@ def openai_client():
 def perturb(document, replacements): # Builds the perturbed document
     pdoc = document
     for find, repl in replacements:
+        assert find in pdoc, f"replacement find-string not present in passage: {find!r}"
         pdoc = pdoc.replace(find, repl)
     # Assert the passage actually changed to avoid misleading interpretations of the perturbed results
     assert pdoc != document, f"no change in passage detected for {replacements}"

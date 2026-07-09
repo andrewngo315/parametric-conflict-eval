@@ -46,11 +46,12 @@ Real runs are explicit and resumable (partial results persist to disk after ever
 python3 harness.py caveat [N]       # error-flagging sweep
 python3 harness.py abstention [N]   # parametric-leakage sweep
 python3 harness.py tradeoff         # joint readout, no API calls
+python3 harness.py vectors          # per-fact/per-item vectors + ICC per cell, no API calls
 python3 judge.py caveat             # re-certify the caveat judge against its gold
 python3 judge.py abstention         # re-certify the abstention judge
 ```
 
-Both sweeps at the default N=8. It is advised to verify your judge first before running the harness. 
+Both sweeps at the default N=4 (the published runs used N=8; reps within a fact turned out to be strongly correlated, so extra reps buy little -- see the independence limitation in results.md). It is advised to verify your judge first before running the harness. 
 
 ## Customisation
 
