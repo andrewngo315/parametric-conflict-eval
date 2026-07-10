@@ -157,3 +157,29 @@ Full grid: `python3 harness.py tradeoff`.
 
 
 
+
+## 8. v2 pre-registered analysis plan (locked 2026-07-10, before the full v2 run)
+
+This section was committed before the full v2 grid was run (the run was stopped 39 cells in, ~0.6% spent, when this plan was locked). Everything below is declared in advance; anything not listed here is exploratory.
+
+**Design.** 24 facts and 24 abstention items across 3 documents (development consent / environment protection licence / liquor licence decision), 3 candidate models, 5 instruction arms, N=3 reps per cell, plus a matched-absence arm: each fact also appears with its answering clause deleted from its own document, so every fact is tested in three evidence states — correct value present (S0), incorrect value present (S1–S5), and value absent.
+
+**Primary outcomes.**
+1. Contradiction sensitivity: questioned rate on perturbed values (S1–S5).
+2. Clean specificity: 1 − (questioned or declined) rate on S0.
+3. Absence faithfulness: faithful-abstention rate on matched-absence cells.
+4. False endorsement rate: endorsed rate on perturbed values.
+5. False corroboration rate: endorsed with generic or named_authority corroboration on perturbed values.
+6. Selective success: per fact × model × instruction, majority-accepts S0 AND majority-questions S3–S5 AND majority-abstains on absence (component rates always reported alongside; the joint metric must not hide where failure occurs).
+
+**Primary comparisons.** The 2×2 factorial over SOURCE_EXCLUSIVE / FLAG_INVITING / WEAK_GROUNDING / SOURCE_EXCLUSIVE_FLAG_INVITING: main effect of source exclusivity, main effect of flag invitation, and their interaction, on outcomes 1, 3 and 4. SELECTIVE_AUDIT is then compared against the best-performing 2×2 cell as an existence test: can any wording that explicitly gates prior knowledge by evidence state achieve contradiction sensitivity and absence faithfulness simultaneously? SELECTIVE_AUDIT is a designed point, not a factorial cell.
+
+**Units and clustering.** Facts and items are the experimental units; reps within a cell are correlated (transition ICC 0.29–1.00 in v1) and are never treated as independent. Per-unit x/n vectors and ICC are reported via `harness.py vectors`. With 3 documents, document-level generalisation is not conclusively estimable; per-document effects are reported individually and headline rates are bracketed between independent-reps and units-as-clusters readings, as in v1.
+
+**Severity contrasts.** Primary: S0 vs pooled S1–S2 (plausible perturbations) vs pooled S3–S5 (extreme). Severity is an ordinal rank, not a calibrated magnitude across facts; a log-ratio secondary view over the ratio-bearing facts is exploratory.
+
+**Data provenance and pooling rules.** Document-1 (consent) caveat cells are seeded from the v1 run: identical documents, ladders, instructions and call parameters (verified by static audit), N=8 rather than 3, judged under judge v3, no model-snapshot records; a 3-cell rerun canary matched v1 rates exactly. Sonnet's consent cells are additionally rerun fresh under recorded snapshots; the seeded sonnet rows are retained as a temporal replication. Headline tables report fresh liquor/EPL(+fresh sonnet consent) and seeded rows separately before pooling, and a sensitivity analysis repeats the primary comparisons with and without seeded rows. All new rows carry candidate snapshot, judge snapshot, rep index, run id and timestamp; the full experimental configuration is frozen in `run_manifest.json` at launch.
+
+**Instrument rules.** SELECTIVE_AUDIT and matched-absence answers are new judge surfaces: their numbers are quarantined until sampled transcripts enter the human-labelled gold sets and both judges re-certify (kappa ≥ 0.8 with zero anchor misses), per the WEAK_GROUNDING precedent. Any judge-prompt change triggers a full rescore so every verdict in a results file comes from one judge version; seeded and pilot rows (judged v3) are rescored to the current judge before corroboration or endorsement breakdowns are read.
+
+**Exclusions and failure handling.** Truncated answers (max-token warnings) are excluded and reported by count. Failed calls retry with backoff and then fail the run loudly; there is no silent dropping. Rows are aggregated per cell as x/n; no cell is reweighted.
