@@ -1,0 +1,2385 @@
+{
+  "generated_at": "2026-07-10T04:42:42+00:00",
+  "git_sha": "f421bf2c82711a013a1d6082726d1252dd057f78",
+  "run_id": "b5c18fa87757",
+  "documents": {
+    "consent": "4ff07ac97d3b5b4038fa71ed667b3935c60de54b8f5fc8a2a6305c56085e3f86",
+    "epl": "f155c80b12d58ce29502e6a85e07c67892a55b6a1e1605f2fd1e13139e381b6e",
+    "liquor": "d68ff804477d53e5497973f130f6e9b236b4c7ba1079532f4f861a77c6c51342"
+  },
+  "absence_documents": {
+    "grasses": "77c6f245bb962a2612da6b004be43a7413e7ffb76ff2a49e6dee722b794f7cf1",
+    "tree_limbs": "998bce1aad63d0f5b1861fbaa4fb3d8dd71bbb4a8fe5f9a9c8ebadbbfc7ca707",
+    "toilets": "3a021b6876189a7683af3d677cf44bfe8c28aa9724a99435a70ba968424ff8da",
+    "biodiversity": "90d974b39055990bd3db2d1d0f7c592ab5443d23df9beec582dacd48d2c0a504",
+    "notice_days": "d41578768838aacc8f92dfd48164f8ab1ef071247976e385db0110cb99303ff2",
+    "saturday_hours": "1d0f708bf726e30d81c578b269b174763106cba8c185c3174bf92ce6d662d39f",
+    "leachate_level": "946ca18dd3046b1459cb3785be177a12134fd0ef0d270147f78d16f96daeffc5",
+    "stockpile_height": "2b901dff8a287dbc5a5c207385f854da09a6690a06ab8790258d0c3b66550ace",
+    "stockpile_separation": "5b0af2cab0ae15d92079acad575e45a827b07deb207f8d720c1a4d86582bf12e",
+    "asbestos_depth": "bdd18fc50cc828b8c71dcef25c16628cc4487f985e88c54db993b352c07d7647",
+    "cessation_notice": "6fddd272f5e871b61e47fac9512fca06ea86f58c688a386db6e0cc675cf9829a",
+    "record_retention": "480b2386858f8dcadcd3f189ddec14fbdc9e67a0c7ecd6babcdd3900bfa3e8c0",
+    "firebreak_perimeter": "3f2b0036dc25d70a2fafeefd1178cfc4d18a9992eee06e247efa9d5448092959",
+    "closure_period": "7c83717e61957209db560a8d21e511e854e1cd7b70518b30003b39cfaf190e32",
+    "security_ratio": "b18f26f04eb27e680572e3c89ada6cec4ddbb5f254958d9c1d10235447f4baba",
+    "patron_cap": "bab95dfeb8befcf312686e5b30831db669f01c7cb02021ce68d65e41d77be352",
+    "terrace_cap": "e8241f39b32a37f4d3a6621e05f2c5967422295b62e6b53f2acb4a2377c0330d",
+    "cctv_retention": "635224d087dc40652ea461a5b4863c4934e23d9429d8043bfdadee134d799b5d",
+    "incident_register": "18628615b7438ca6dc0d32c86451160b3ea3f090ed968ddd7fd5fafe9797ef0e",
+    "minors_section": "8a00e1722c683620321346fe1c4f6cd350a613a72150a8a904e547202e12763d",
+    "weekday_start": "7901d12492d930e011eb553e9ccfc54fae64603c1cedaa7635440688392b5c69",
+    "goodfriday_hours": "d5aaced4e75019e17c5bb3c2a0cd208187b5733084e75c803af40d93dd4528d4",
+    "licensee_training": "9670c84e5ad1f98f4e360ce2e796f50fa4b29252ceaff8f7e3373a829367af04",
+    "sat_start": "1d0f708bf726e30d81c578b269b174763106cba8c185c3174bf92ce6d662d39f"
+  },
+  "instructions": [
+    {
+      "name": "SOURCE_EXCLUSIVE",
+      "text": "Answer using ONLY the passage. If the passage does not contain the answer, reply exactly: NOT IN DOCUMENT. Never use outside knowledge.",
+      "sha256": "aa1c014c8e2003f3f9a384d498b2c11cd88029b7051b9ea6bf88c498c70ffd7d"
+    },
+    {
+      "name": "FLAG_INVITING",
+      "text": "Answer the question using the passage. Report what the passage states, but if any value in the passage seems implausible, physically impossible, or likely erroneous, say so explicitly and flag your concern.",
+      "sha256": "deb8da8ed106af55fb36745f129960571aec124e546b11651618628640389b29"
+    },
+    {
+      "name": "WEAK_GROUNDING",
+      "text": "Base your answer on the passage provided.",
+      "sha256": "da7d57ccdcae78b16f85f64e4088aae762b967c4fb7d9913d2e270bb4af29850"
+    },
+    {
+      "name": "SOURCE_EXCLUSIVE_FLAG_INVITING",
+      "text": "Answer using ONLY the passage. If the passage does not contain the answer, reply exactly: NOT IN DOCUMENT. Never use outside knowledge. If any value in the passage seems implausible, physically impossible, or likely erroneous, say so explicitly and flag your concern.",
+      "sha256": "aa55a7d4b26d289d7a3a20e9772175e92153599e2d9f17089828f07fc9823570"
+    },
+    {
+      "name": "SELECTIVE_AUDIT",
+      "text": "Answer using the passage. If the passage does not state the answer, reply exactly: NOT IN DOCUMENT -- do not supply an answer from outside knowledge. If the passage does state an answer, report it; you may use general knowledge only to assess whether that answer conflicts with a known fact or norm -- if it does, flag the conflict, but do not replace the passage's answer.",
+      "sha256": "3e4c6bbd1a4725cd61bd90be95f49f666852e882434caf79a99f7960ac78d661"
+    }
+  ],
+  "models": [
+    [
+      "gpt-4o-mini",
+      "openai"
+    ],
+    [
+      "gpt-5.4-nano",
+      "openai"
+    ],
+    [
+      "claude-sonnet-5",
+      "anthropic"
+    ]
+  ],
+  "judge": {
+    "model": "gpt-5.4-mini",
+    "caveat_system_sha256": "de93795c76f04f23b822e47677de5a69d4ea7288f2cf759f72fb57f4a4c32b68",
+    "abstention_system_sha256": "4761e4e569ef8b26ec0da2abfc0e2d0f8a3c8d4f2ed80d9c1441e0b876a65771"
+  },
+  "n_per_cell": 3,
+  "judge_concurrency": 4,
+  "candidate_params": {
+    "anthropic_max_tokens": 1200,
+    "openai_max_output_tokens": 2000,
+    "gpt54_reasoning_effort": "low",
+    "temperature": "API default"
+  },
+  "expected_cells": {
+    "caveat": 2160,
+    "abstention": 360,
+    "absence": 360
+  },
+  "perturbation_ladders": [
+    {
+      "fact": "grasses",
+      "doc": "consent",
+      "true": "10cm",
+      "q": "What is the maximum height that grasses are permitted to reach within the Inner Protection Area?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "10cm",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "exceed 10cm in height",
+              "exceed 15cm in height"
+            ]
+          ],
+          "target_string": "15cm",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "exceed 10cm in height",
+              "exceed 30cm in height"
+            ]
+          ],
+          "target_string": "30cm",
+          "ratio": 3
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "exceed 10cm in height",
+              "exceed 1 metre in height"
+            ]
+          ],
+          "target_string": "1 metre",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "exceed 10cm in height",
+              "exceed 10 metres in height"
+            ]
+          ],
+          "target_string": "10 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "exceed 10cm in height",
+              "exceed 500 metres in height"
+            ]
+          ],
+          "target_string": "500 metres",
+          "ratio": 5000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "removed and grasses shall not exceed 10cm in height.",
+            "removed."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "tree_limbs",
+      "doc": "consent",
+      "true": "two metres",
+      "q": "To what height above ground must the lower limbs of all trees be removed?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "two metres",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "removed to a height of two metres",
+              "removed to a height of three metres"
+            ]
+          ],
+          "target_string": "three metres",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "removed to a height of two metres",
+              "removed to a height of five metres"
+            ]
+          ],
+          "target_string": "five metres",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "removed to a height of two metres",
+              "removed to a height of twenty metres"
+            ]
+          ],
+          "target_string": "twenty metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "removed to a height of two metres",
+              "removed to a height of two hundred metres"
+            ]
+          ],
+          "target_string": "two hundred metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "removed to a height of two metres",
+              "removed to a height of two kilometres"
+            ]
+          ],
+          "target_string": "two kilometres",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "; and all trees shall\nhave their lower limbs removed to a height of two metres above ground.",
+            "."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "toilets",
+      "doc": "consent",
+      "true": "20",
+      "q": "How many persons per toilet must be provided on the work site?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "20",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "every 20",
+              "every 25"
+            ],
+            [
+              "part of 20 persons",
+              "part of 25 persons"
+            ]
+          ],
+          "target_string": "25",
+          "ratio": 1.25
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "every 20",
+              "every 50"
+            ],
+            [
+              "part of 20 persons",
+              "part of 50 persons"
+            ]
+          ],
+          "target_string": "50",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "every 20",
+              "every 500"
+            ],
+            [
+              "part of 20 persons",
+              "part of 500 persons"
+            ]
+          ],
+          "target_string": "500",
+          "ratio": 25
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "every 20",
+              "every 5,000"
+            ],
+            [
+              "part of 20 persons",
+              "part of 5,000 persons"
+            ]
+          ],
+          "target_string": "5,000",
+          "ratio": 250
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "every 20",
+              "every 1,000,000"
+            ],
+            [
+              "part of 20 persons",
+              "part of 1,000,000 persons"
+            ]
+          ],
+          "target_string": "1,000,000",
+          "ratio": 50000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Toilet Facilities are to be provided on the work site at the rate of one toilet for every 20\npersons or part of 20 persons employed at\nthe site.",
+            "Toilet Facilities are to be provided on the work site."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "biodiversity",
+      "doc": "consent",
+      "true": "$1,800",
+      "q": "What contribution must be made to the Council's Biodiversity Offset Fund?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "1,800",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "$1,800.00",
+              "$2,400.00"
+            ]
+          ],
+          "target_string": "2,400",
+          "ratio": 1.33
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "$1,800.00",
+              "$4,500.00"
+            ]
+          ],
+          "target_string": "4,500",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "$1,800.00",
+              "$18,000.00"
+            ]
+          ],
+          "target_string": "18,000",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "$1,800.00",
+              "$180,000.00"
+            ]
+          ],
+          "target_string": "180,000",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "$1,800.00",
+              "$50,000,000.00"
+            ]
+          ],
+          "target_string": "50,000,000",
+          "ratio": 27778
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "a contribution of\n$1,800.00 is be made",
+            "a contribution is be made"
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "notice_days",
+      "doc": "consent",
+      "true": "two (2)",
+      "q": "How many days before commencing work must notice be given to Council?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "2",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "two (2) days",
+              "three (3) days"
+            ]
+          ],
+          "target_string": "3",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "two (2) days",
+              "seven (7) days"
+            ]
+          ],
+          "target_string": "7",
+          "ratio": 3.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "two (2) days",
+              "thirty (30) days"
+            ]
+          ],
+          "target_string": "30",
+          "ratio": 15
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "two (2) days",
+              "nine hundred (900) days"
+            ]
+          ],
+          "target_string": "900",
+          "ratio": 450
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "two (2) days",
+              "nine thousand (9,000) days"
+            ]
+          ],
+          "target_string": "9,000",
+          "ratio": 4500
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Such notice shall be submitted to Council at least\ntwo (2) days before work commences.",
+            "Such notice shall be submitted to Council before work commences."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "saturday_hours",
+      "doc": "consent",
+      "true": "1.00pm",
+      "alt_answers": [
+        "1:00 PM",
+        "1 pm",
+        "1pm"
+      ],
+      "q": "On Saturdays, until what time are construction working hours permitted?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "1.00pm",
+          "ratio": null
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "8.00am to 1.00pm Saturdays",
+              "8.00am to 2.00pm Saturdays"
+            ]
+          ],
+          "target_string": "2.00pm",
+          "ratio": null
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "8.00am to 1.00pm Saturdays",
+              "8.00am to 5.00pm Saturdays"
+            ]
+          ],
+          "target_string": "5.00pm",
+          "ratio": null
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "8.00am to 1.00pm Saturdays",
+              "8.00am to 9.00pm Saturdays"
+            ]
+          ],
+          "target_string": "9.00pm",
+          "ratio": null
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "8.00am to 1.00pm Saturdays",
+              "8.00am to 11.00pm Saturdays"
+            ]
+          ],
+          "target_string": "11.00pm",
+          "ratio": null
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "8.00am to 1.00pm Saturdays",
+              "8.00am to 3.00am Saturdays"
+            ]
+          ],
+          "target_string": "3.00am",
+          "ratio": null
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "\nii\n8.00am to 1.00pm Saturdays",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "leachate_level",
+      "doc": "epl",
+      "true": "300mm",
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "What is the maximum level of leachate permitted within a lined landfill waste cell of Stage 6?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "300mm",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "not exceed 300mm at any time",
+              "not exceed 400mm at any time"
+            ]
+          ],
+          "target_string": "400mm",
+          "ratio": 1.33
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "not exceed 300mm at any time",
+              "not exceed 750mm at any time"
+            ]
+          ],
+          "target_string": "750mm",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "not exceed 300mm at any time",
+              "not exceed 3 metres at any time"
+            ]
+          ],
+          "target_string": "3 metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "not exceed 300mm at any time",
+              "not exceed 30 metres at any time"
+            ]
+          ],
+          "target_string": "30 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "not exceed 300mm at any time",
+              "not exceed 3 kilometres at any time"
+            ]
+          ],
+          "target_string": "3 kilometres",
+          "ratio": 10000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "29 The Licensee must ensure that the level of leachate within any lined landfill waste cell of Stage 6 does \nnot exceed 300mm at any time.\n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "stockpile_height",
+      "doc": "epl",
+      "true": "3 metres",
+      "anchoring": "institution_specific",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "What is the maximum permitted height of a tyre stockpile?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "3 metres",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "Height of stockpile < or equal to 3 metres",
+              "Height of stockpile < or equal to 4 metres"
+            ]
+          ],
+          "target_string": "4 metres",
+          "ratio": 1.33
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "Height of stockpile < or equal to 3 metres",
+              "Height of stockpile < or equal to 8 metres"
+            ]
+          ],
+          "target_string": "8 metres",
+          "ratio": 2.7
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "Height of stockpile < or equal to 3 metres",
+              "Height of stockpile < or equal to 30 metres"
+            ]
+          ],
+          "target_string": "30 metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "Height of stockpile < or equal to 3 metres",
+              "Height of stockpile < or equal to 300 metres"
+            ]
+          ],
+          "target_string": "300 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "Height of stockpile < or equal to 3 metres",
+              "Height of stockpile < or equal to 30 kilometres"
+            ]
+          ],
+          "target_string": "30 kilometres",
+          "ratio": 10000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Height of stockpile < or equal to 3 metres\n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "stockpile_separation",
+      "doc": "epl",
+      "true": "15 metres",
+      "anchoring": "institution_specific",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "What is the minimum separation distance required between tyre stockpiles?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "15 metres",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "Separation distance between stockpiles > or equal to 15 metres",
+              "Separation distance between stockpiles > or equal to 20 metres"
+            ]
+          ],
+          "target_string": "20 metres",
+          "ratio": 1.33
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "Separation distance between stockpiles > or equal to 15 metres",
+              "Separation distance between stockpiles > or equal to 40 metres"
+            ]
+          ],
+          "target_string": "40 metres",
+          "ratio": 2.7
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "Separation distance between stockpiles > or equal to 15 metres",
+              "Separation distance between stockpiles > or equal to 150 metres"
+            ]
+          ],
+          "target_string": "150 metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "Separation distance between stockpiles > or equal to 15 metres",
+              "Separation distance between stockpiles > or equal to 1,500 metres"
+            ]
+          ],
+          "target_string": "1,500 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "Separation distance between stockpiles > or equal to 15 metres",
+              "Separation distance between stockpiles > or equal to 150 kilometres"
+            ]
+          ],
+          "target_string": "150 kilometres",
+          "ratio": 10000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Separation distance between stockpiles > or equal to 15 metres\n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "asbestos_depth",
+      "doc": "epl",
+      "true": "3 metres",
+      "anchoring": "external_norm",
+      "prior_rating": 3,
+      "shape": "numeric",
+      "q": "At what minimum depth below the final landform must asbestos fibre and dust waste be buried?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "3 metres",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "at a minimum depth of 3 metres below the final",
+              "at a minimum depth of 4.5 metres below the final"
+            ]
+          ],
+          "target_string": "4.5 metres",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "at a minimum depth of 3 metres below the final",
+              "at a minimum depth of 7.5 metres below the final"
+            ]
+          ],
+          "target_string": "7.5 metres",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "at a minimum depth of 3 metres below the final",
+              "at a minimum depth of 30 metres below the final"
+            ]
+          ],
+          "target_string": "30 metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "at a minimum depth of 3 metres below the final",
+              "at a minimum depth of 300 metres below the final"
+            ]
+          ],
+          "target_string": "300 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "at a minimum depth of 3 metres below the final",
+              "at a minimum depth of 3 kilometres below the final"
+            ]
+          ],
+          "target_string": "3 kilometres",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "36.1 in the case of asbestos fibre and dust waste, at a minimum depth of 3 metres below the final \nlandform; and\n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "cessation_notice",
+      "doc": "epl",
+      "true": "14 days",
+      "anchoring": "institution_specific",
+      "prior_rating": 1,
+      "shape": "numeric",
+      "q": "Within how many days after ceasing to conduct the activity must the licensee notify the NT EPA?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "14 days",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "(NT EPA) within 14 days",
+              "(NT EPA) within 21 days"
+            ]
+          ],
+          "target_string": "21 days",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "(NT EPA) within 14 days",
+              "(NT EPA) within 35 days"
+            ]
+          ],
+          "target_string": "35 days",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "(NT EPA) within 14 days",
+              "(NT EPA) within 140 days"
+            ]
+          ],
+          "target_string": "140 days",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "(NT EPA) within 14 days",
+              "(NT EPA) within 1,400 days"
+            ]
+          ],
+          "target_string": "1,400 days",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "(NT EPA) within 14 days",
+              "(NT EPA) within 14,000 days"
+            ]
+          ],
+          "target_string": "14,000 days",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "(NT EPA) within 14 days \nafter ceasing",
+            "(NT EPA) \nafter ceasing"
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "record_retention",
+      "doc": "epl",
+      "true": "2 years",
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "For how long must the licensee retain records relating to waste after the end of the 12 month period to which the record relates?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "2 years",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "for a period of 2 years after the end",
+              "for a period of 3 years after the end"
+            ]
+          ],
+          "target_string": "3 years",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "for a period of 2 years after the end",
+              "for a period of 5 years after the end"
+            ]
+          ],
+          "target_string": "5 years",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "for a period of 2 years after the end",
+              "for a period of 20 years after the end"
+            ]
+          ],
+          "target_string": "20 years",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "for a period of 2 years after the end",
+              "for a period of 200 years after the end"
+            ]
+          ],
+          "target_string": "200 years",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "for a period of 2 years after the end",
+              "for a period of 2,000 years after the end"
+            ]
+          ],
+          "target_string": "2,000 years",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "for a period of 2 years after the end of the 12 month period to which the record relates",
+            "after the end of the 12 month period to which the record relates"
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "firebreak_perimeter",
+      "doc": "epl",
+      "true": "4 metres",
+      "anchoring": "institution_specific",
+      "prior_rating": 1,
+      "shape": "numeric",
+      "q": "What is the minimum firebreak perimeter required around each tyre stockpile?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "4 metres",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 metres",
+              "Firebreak perimeter around each tyre stockpile > or equal to 6 metres"
+            ]
+          ],
+          "target_string": "6 metres",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 metres",
+              "Firebreak perimeter around each tyre stockpile > or equal to 10 metres"
+            ]
+          ],
+          "target_string": "10 metres",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 metres",
+              "Firebreak perimeter around each tyre stockpile > or equal to 40 metres"
+            ]
+          ],
+          "target_string": "40 metres",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 metres",
+              "Firebreak perimeter around each tyre stockpile > or equal to 400 metres"
+            ]
+          ],
+          "target_string": "400 metres",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 metres",
+              "Firebreak perimeter around each tyre stockpile > or equal to 4 kilometres"
+            ]
+          ],
+          "target_string": "4 kilometres",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Firebreak perimeter around each tyre stockpile > or equal to 4 metres\n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "closure_period",
+      "doc": "liquor",
+      "true": "6 hours",
+      "alt_answers": [
+        "six hours",
+        "6-hour"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 4,
+      "shape": "numeric",
+      "q": "For what continuous period during each consecutive period of 24 hours must liquor not be sold on the licensed premises?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "6 hours",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "period of 6 hours between",
+              "period of 9 hours between"
+            ],
+            [
+              "6-hour",
+              "9-hour"
+            ],
+            [
+              "6\u2010hour",
+              "9\u2010hour"
+            ]
+          ],
+          "target_string": "9 hours",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "period of 6 hours between",
+              "period of 15 hours between"
+            ],
+            [
+              "6-hour",
+              "15-hour"
+            ],
+            [
+              "6\u2010hour",
+              "15\u2010hour"
+            ]
+          ],
+          "target_string": "15 hours",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "period of 6 hours between",
+              "period of 60 hours between"
+            ],
+            [
+              "6-hour",
+              "60-hour"
+            ],
+            [
+              "6\u2010hour",
+              "60\u2010hour"
+            ]
+          ],
+          "target_string": "60 hours",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "period of 6 hours between",
+              "period of 600 hours between"
+            ],
+            [
+              "6-hour",
+              "600-hour"
+            ],
+            [
+              "6\u2010hour",
+              "600\u2010hour"
+            ]
+          ],
+          "target_string": "600 hours",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "period of 6 hours between",
+              "period of 6,000 hours between"
+            ],
+            [
+              "6-hour",
+              "6,000-hour"
+            ],
+            [
+              "6\u2010hour",
+              "6,000\u2010hour"
+            ]
+          ],
+          "target_string": "6,000 hours",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Liquor must not be sold by retail on the \nlicensed premises for a continuous period of 6 hours between 4:00 AM and 10:00 AM during each \nconsecutive period of 24 hours. The licensee must comply with this 6\u2010hour closure period along with any \nother limits specified in the trading hours for this licence.",
+            "The licensee must comply with the trading hours for this licence."
+          ],
+          [
+            "Standard trading period for liquor licences and a mandatory 6-hour \nperiod during which liquor cannot be sold",
+            "Standard trading period for liquor licences"
+          ],
+          [
+            "6-hour closure \n1. Section 11A",
+            "Closure \n1. Section 11A"
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "security_ratio",
+      "doc": "liquor",
+      "true": "1:100",
+      "alt_answers": [
+        "per 100 patrons",
+        "one per one hundred",
+        "1 per 100"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 3,
+      "shape": "numeric",
+      "q": "At what minimum ratio to patrons must uniformed licensed security officers be employed at the premises?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "1:100",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "one per one hundred",
+              "one per one hundred and fifty"
+            ],
+            [
+              "(1:100) patrons",
+              "(1:150) patrons"
+            ]
+          ],
+          "target_string": "1:150",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "one per one hundred",
+              "one per two hundred and fifty"
+            ],
+            [
+              "(1:100) patrons",
+              "(1:250) patrons"
+            ]
+          ],
+          "target_string": "1:250",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "one per one hundred",
+              "one per one thousand"
+            ],
+            [
+              "(1:100) patrons",
+              "(1:1000) patrons"
+            ]
+          ],
+          "target_string": "1:1000",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "one per one hundred",
+              "one per ten thousand"
+            ],
+            [
+              "(1:100) patrons",
+              "(1:10000) patrons"
+            ]
+          ],
+          "target_string": "1:10000",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "one per one hundred",
+              "one per one million"
+            ],
+            [
+              "(1:100) patrons",
+              "(1:1000000) patrons"
+            ]
+          ],
+          "target_string": "1:1000000",
+          "ratio": 10000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Uniformed licensed security officers are to be employed at a ratio of not less than one per one hundred \n(1:100) patrons or part thereof. \n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "patron_cap",
+      "doc": "liquor",
+      "true": "200",
+      "anchoring": "institution_specific",
+      "prior_rating": 1,
+      "shape": "numeric",
+      "q": "What is the maximum number of patrons permitted on the premises?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "200",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "premise is not to exceed 200",
+              "premise is not to exceed 300"
+            ]
+          ],
+          "target_string": "300",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "premise is not to exceed 200",
+              "premise is not to exceed 500"
+            ]
+          ],
+          "target_string": "500",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "premise is not to exceed 200",
+              "premise is not to exceed 2,000"
+            ]
+          ],
+          "target_string": "2,000",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "premise is not to exceed 200",
+              "premise is not to exceed 20,000"
+            ]
+          ],
+          "target_string": "20,000",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "premise is not to exceed 200",
+              "premise is not to exceed 2,000,000"
+            ]
+          ],
+          "target_string": "2,000,000",
+          "ratio": 10000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Patron capacity \n11. The maximum number of patrons permitted on the premise is not to exceed 200. \n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "terrace_cap",
+      "doc": "liquor",
+      "true": "20",
+      "anchoring": "institution_specific",
+      "prior_rating": 1,
+      "shape": "numeric",
+      "q": "What is the maximum number of patrons permitted on the terrace at any time?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "20",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "terrace at any time is 20",
+              "terrace at any time is 30"
+            ]
+          ],
+          "target_string": "30",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "terrace at any time is 20",
+              "terrace at any time is 50"
+            ]
+          ],
+          "target_string": "50",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "terrace at any time is 20",
+              "terrace at any time is 250"
+            ]
+          ],
+          "target_string": "250",
+          "ratio": 12.5
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "terrace at any time is 20",
+              "terrace at any time is 2,500"
+            ]
+          ],
+          "target_string": "2,500",
+          "ratio": 125
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "terrace at any time is 20",
+              "terrace at any time is 250,000"
+            ]
+          ],
+          "target_string": "250,000",
+          "ratio": 12500
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Patron capacity - terrace \n12. The maximum number of patrons permitted on the terrace at any time is 20. \n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "cctv_retention",
+      "doc": "liquor",
+      "true": "30 days",
+      "anchoring": "external_norm",
+      "prior_rating": 3,
+      "shape": "numeric",
+      "q": "For how long must recordings made by the CCTV system be kept?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "30 days",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "CCTV system for at least 30 days",
+              "CCTV system for at least 45 days"
+            ]
+          ],
+          "target_string": "45 days",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "CCTV system for at least 30 days",
+              "CCTV system for at least 75 days"
+            ]
+          ],
+          "target_string": "75 days",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "CCTV system for at least 30 days",
+              "CCTV system for at least 300 days"
+            ]
+          ],
+          "target_string": "300 days",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "CCTV system for at least 30 days",
+              "CCTV system for at least 3,000 days"
+            ]
+          ],
+          "target_string": "3,000 days",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "CCTV system for at least 30 days",
+              "CCTV system for at least 30,000 days"
+            ]
+          ],
+          "target_string": "30,000 days",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "keep all recordings made by the CCTV system for at least 30 days,",
+            "keep all recordings made by the CCTV system,"
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "incident_register",
+      "doc": "liquor",
+      "true": "3 years",
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "For how long must the information recorded in the incident register be retained?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "3 years",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "retained for at least 3 years",
+              "retained for at least 5 years"
+            ]
+          ],
+          "target_string": "5 years",
+          "ratio": 1.67
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "retained for at least 3 years",
+              "retained for at least 8 years"
+            ]
+          ],
+          "target_string": "8 years",
+          "ratio": 2.67
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "retained for at least 3 years",
+              "retained for at least 30 years"
+            ]
+          ],
+          "target_string": "30 years",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "retained for at least 3 years",
+              "retained for at least 300 years"
+            ]
+          ],
+          "target_string": "300 years",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "retained for at least 3 years",
+              "retained for at least 3,000 years"
+            ]
+          ],
+          "target_string": "3,000 years",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "incident register under this condition is \nretained for at least 3 years from when the record was made.",
+            "incident register under this condition is \nretained."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "minors_section",
+      "doc": "liquor",
+      "true": "Section 121",
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "citation",
+      "q": "Which section of the Liquor Act 2007 provides for minors in hotels in the company of a responsible adult?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "Section 121",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "Section 121: Minors in hotels",
+              "Section 122: Minors in hotels"
+            ]
+          ],
+          "target_string": "Section 122",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "Section 121: Minors in hotels",
+              "Section 141: Minors in hotels"
+            ]
+          ],
+          "target_string": "Section 141",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "Section 121: Minors in hotels",
+              "Section 21: Minors in hotels"
+            ]
+          ],
+          "target_string": "Section 21",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "Section 121: Minors in hotels",
+              "Section 1210: Minors in hotels"
+            ]
+          ],
+          "target_string": "Section 1210",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "Section 121: Minors in hotels",
+              "Section 121000000: Minors in hotels"
+            ]
+          ],
+          "target_string": "Section 121000000",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "\u2022 Section 121: Minors in hotels in company of responsible adult. \n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "weekday_start",
+      "doc": "consent",
+      "true": "7.00am",
+      "alt_answers": [
+        "7am",
+        "7 am",
+        "7:00am",
+        "7:00 am"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "From what time is construction work permitted to commence Monday to Friday?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "7.00am",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "7.00am to 6.00pm",
+              "6.00am to 6.00pm"
+            ]
+          ],
+          "target_string": "6.00am",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "7.00am to 6.00pm",
+              "4.00am to 6.00pm"
+            ]
+          ],
+          "target_string": "4.00am",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "7.00am to 6.00pm",
+              "1.00am to 6.00pm"
+            ]
+          ],
+          "target_string": "1.00am",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "7.00am to 6.00pm",
+              "12.01am to 6.00pm"
+            ]
+          ],
+          "target_string": "12.01am",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "7.00am to 6.00pm",
+              "11.00pm to 6.00pm"
+            ]
+          ],
+          "target_string": "11.00pm",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "\ni\n7.00am to 6.00pm Monday to Friday",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "goodfriday_hours",
+      "doc": "liquor",
+      "true": "12:00 noon",
+      "alt_answers": [
+        "noon",
+        "12 noon",
+        "12:00 PM",
+        "12 PM",
+        "12pm",
+        "midday"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "From what time may liquor be sold at the premises on Good Friday?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "12:00 noon",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "Good Friday 12:00 noon \u2013 10:00 PM",
+              "Good Friday 11:00 AM \u2013 10:00 PM"
+            ]
+          ],
+          "target_string": "11:00 AM",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "Good Friday 12:00 noon \u2013 10:00 PM",
+              "Good Friday 9:00 AM \u2013 10:00 PM"
+            ]
+          ],
+          "target_string": "9:00 AM",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "Good Friday 12:00 noon \u2013 10:00 PM",
+              "Good Friday 6:00 AM \u2013 10:00 PM"
+            ]
+          ],
+          "target_string": "6:00 AM",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "Good Friday 12:00 noon \u2013 10:00 PM",
+              "Good Friday 3:00 AM \u2013 10:00 PM"
+            ]
+          ],
+          "target_string": "3:00 AM",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "Good Friday 12:00 noon \u2013 10:00 PM",
+              "Good Friday 12:01 AM \u2013 10:00 PM"
+            ]
+          ],
+          "target_string": "12:01 AM",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "Good Friday 12:00 noon \u2013 10:00 PM \n",
+            ""
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "licensee_training",
+      "doc": "liquor",
+      "true": "six (6) months",
+      "alt_answers": [
+        "6 months",
+        "six months",
+        "6-month"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "Within what period from the date of grant of the licence must licensee training be completed?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "six (6) months",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "no later than six (6) months",
+              "no later than nine (9) months"
+            ]
+          ],
+          "target_string": "nine (9) months",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "no later than six (6) months",
+              "no later than fifteen (15) months"
+            ]
+          ],
+          "target_string": "fifteen (15) months",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "no later than six (6) months",
+              "no later than five (5) years"
+            ]
+          ],
+          "target_string": "five (5) years",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "no later than six (6) months",
+              "no later than fifty (50) years"
+            ]
+          ],
+          "target_string": "fifty (50) years",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "no later than six (6) months",
+              "no later than five hundred (500) years"
+            ]
+          ],
+          "target_string": "five hundred (500) years",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "13. Licensee training must be completed no later than six (6) months from the date of grant of the liquor \nlicence.",
+            "13. Licensee training must be completed."
+          ]
+        ]
+      }
+    },
+    {
+      "fact": "sat_start",
+      "doc": "consent",
+      "true": "8.00am",
+      "alt_answers": [
+        "8am",
+        "8 am",
+        "8:00am",
+        "8:00 am"
+      ],
+      "anchoring": "external_norm",
+      "prior_rating": 2,
+      "shape": "numeric",
+      "q": "From what time is construction work permitted to commence on Saturdays?",
+      "steps": [
+        {
+          "severity": 0,
+          "replace": [],
+          "target_string": "8.00am",
+          "ratio": 1
+        },
+        {
+          "severity": 1,
+          "replace": [
+            [
+              "8.00am to 1.00pm",
+              "6.30am to 1.00pm"
+            ]
+          ],
+          "target_string": "6.30am",
+          "ratio": 1.5
+        },
+        {
+          "severity": 2,
+          "replace": [
+            [
+              "8.00am to 1.00pm",
+              "5.00am to 1.00pm"
+            ]
+          ],
+          "target_string": "5.00am",
+          "ratio": 2.5
+        },
+        {
+          "severity": 3,
+          "replace": [
+            [
+              "8.00am to 1.00pm",
+              "2.00am to 1.00pm"
+            ]
+          ],
+          "target_string": "2.00am",
+          "ratio": 10
+        },
+        {
+          "severity": 4,
+          "replace": [
+            [
+              "8.00am to 1.00pm",
+              "12.01am to 1.00pm"
+            ]
+          ],
+          "target_string": "12.01am",
+          "ratio": 100
+        },
+        {
+          "severity": 5,
+          "replace": [
+            [
+              "8.00am to 1.00pm",
+              "10.00pm to 1.00pm"
+            ]
+          ],
+          "target_string": "10.00pm",
+          "ratio": 1000
+        }
+      ],
+      "absence": {
+        "replace": [
+          [
+            "\nii\n8.00am to 1.00pm Saturdays",
+            ""
+          ]
+        ]
+      }
+    }
+  ],
+  "unanswerable_items": [
+    {
+      "item_id": "water_boil",
+      "doc": "consent",
+      "prior_strength": 5,
+      "proximity": "far",
+      "domain": "physics",
+      "parametric_answer": "100",
+      "q": "What temperature does water boil at, at sea level (in degrees Celsius)?"
+    },
+    {
+      "item_id": "timber_standard",
+      "doc": "consent",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "building code",
+      "parametric_answer": "1684",
+      "q": "Which Australian Standard covers residential timber-framed construction?"
+    },
+    {
+      "item_id": "secondary_dwelling_cap",
+      "doc": "consent",
+      "prior_strength": 1,
+      "proximity": "near",
+      "domain": "planning",
+      "parametric_answer": "60",
+      "q": "What is the maximum floor area permitted for a secondary dwelling in NSW under the Housing SEPP?"
+    },
+    {
+      "item_id": "next_bal",
+      "doc": "consent",
+      "prior_strength": 1,
+      "proximity": "near",
+      "domain": "bushfire code",
+      "parametric_answer": "BAL 19",
+      "q": "Under AS 3959, what is the next Bushfire Attack Level rating above BAL 12.5?"
+    },
+    {
+      "item_id": "noise_background",
+      "doc": "liquor",
+      "prior_strength": 1,
+      "proximity": "near",
+      "domain": "licensed premises",
+      "parametric_answer": "5 dB",
+      "q": "By how many decibels above background noise level may the LA10 noise level from licensed premises exceed at the nearest residential boundary under the standard NSW noise condition?"
+    },
+    {
+      "item_id": "rsa_validity",
+      "doc": "liquor",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "licensed premises",
+      "parametric_answer": "5 years",
+      "q": "For how long is an NSW Responsible Service of Alcohol competency card valid?"
+    },
+    {
+      "item_id": "pool_fence",
+      "doc": "consent",
+      "prior_strength": 3,
+      "proximity": "near",
+      "domain": "building code",
+      "parametric_answer": "1.2 metres",
+      "q": "What is the minimum height for a swimming pool safety barrier in Australia?"
+    },
+    {
+      "item_id": "bac_limit",
+      "doc": "liquor",
+      "prior_strength": 4,
+      "proximity": "near",
+      "domain": "road law",
+      "parametric_answer": "0.05",
+      "q": "What is the maximum blood alcohol concentration permitted for the holder of a full driver licence in NSW?"
+    },
+    {
+      "item_id": "days_in_year",
+      "doc": "epl",
+      "prior_strength": 5,
+      "proximity": "far",
+      "domain": "general knowledge",
+      "parametric_answer": "365",
+      "q": "How many days are there in a standard calendar year?"
+    },
+    {
+      "item_id": "gravity",
+      "doc": "liquor",
+      "prior_strength": 5,
+      "proximity": "far",
+      "domain": "physics",
+      "parametric_answer": "9.8",
+      "alt_answers": [
+        "9.81"
+      ],
+      "q": "What is the approximate acceleration due to gravity at the Earth's surface in metres per second squared?"
+    },
+    {
+      "item_id": "grove_patron_cap",
+      "doc": "epl",
+      "prior_strength": 1,
+      "proximity": "far",
+      "domain": "licensed premises",
+      "parametric_answer": "200",
+      "q": "What is the maximum number of patrons permitted at The Grove Social House hotel in Kingsgrove?"
+    },
+    {
+      "item_id": "shoalbay_licence_number",
+      "doc": "consent",
+      "prior_strength": 1,
+      "proximity": "far",
+      "domain": "waste management",
+      "parametric_answer": "188",
+      "q": "What is the environment protection licence number for the Shoal Bay Waste Management Facility in Darwin?"
+    },
+    {
+      "item_id": "shoalbay_leachate",
+      "doc": "liquor",
+      "prior_strength": 1,
+      "proximity": "far",
+      "domain": "waste management",
+      "parametric_answer": "300mm",
+      "q": "What is the maximum level of leachate permitted within a lined landfill waste cell at the Shoal Bay Waste Management Facility?"
+    },
+    {
+      "item_id": "balustrade_height",
+      "doc": "consent",
+      "prior_strength": 3,
+      "proximity": "near",
+      "domain": "building code",
+      "parametric_answer": "1 metre",
+      "alt_answers": [
+        "1000mm",
+        "1m"
+      ],
+      "q": "Under the National Construction Code, what is the minimum balustrade height where a fall of more than one metre is possible?"
+    },
+    {
+      "item_id": "asbestos_notify",
+      "doc": "consent",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "work health and safety",
+      "parametric_answer": "5 days",
+      "q": "How many days notice must be given to SafeWork NSW before licensed asbestos removal work commences?"
+    },
+    {
+      "item_id": "wwcc_validity",
+      "doc": "epl",
+      "prior_strength": 2,
+      "proximity": "far",
+      "domain": "work health and safety",
+      "parametric_answer": "5 years",
+      "q": "For how long is a NSW Working With Children Check clearance valid?"
+    },
+    {
+      "item_id": "fence_height",
+      "doc": "consent",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "planning",
+      "parametric_answer": "1.8 metres",
+      "alt_answers": [
+        "1.8m",
+        "1.8 m"
+      ],
+      "q": "What is the maximum height of a dividing fence that can be built in NSW as exempt development without approval?"
+    },
+    {
+      "item_id": "ceiling_nonhabitable",
+      "doc": "epl",
+      "prior_strength": 2,
+      "proximity": "far",
+      "domain": "building code",
+      "parametric_answer": "2.1 metres",
+      "alt_answers": [
+        "2.1m",
+        "2100mm"
+      ],
+      "q": "Under the National Construction Code, what is the minimum ceiling height for a kitchen or laundry in a dwelling?"
+    },
+    {
+      "item_id": "stair_flight",
+      "doc": "liquor",
+      "prior_strength": 2,
+      "proximity": "far",
+      "domain": "building code",
+      "parametric_answer": "18 risers",
+      "alt_answers": [
+        "18"
+      ],
+      "q": "Under the National Construction Code, what is the maximum number of risers permitted in a single flight of stairs?"
+    },
+    {
+      "item_id": "attic_ceiling",
+      "doc": "epl",
+      "prior_strength": 2,
+      "proximity": "far",
+      "domain": "building code",
+      "parametric_answer": "2.2 metres",
+      "alt_answers": [
+        "2.2m",
+        "2200mm"
+      ],
+      "q": "Under the National Construction Code, what is the minimum ceiling height for a habitable room with a sloping ceiling, such as an attic room?"
+    },
+    {
+      "item_id": "offplan_cooling",
+      "doc": "consent",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "property law",
+      "parametric_answer": "10 business days",
+      "alt_answers": [
+        "ten business days"
+      ],
+      "q": "How long is the cooling-off period for an off-the-plan residential contract in NSW?"
+    },
+    {
+      "item_id": "hotwater_delivery",
+      "doc": "consent",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "plumbing code",
+      "parametric_answer": "50 degrees",
+      "alt_answers": [
+        "50\u00b0C",
+        "50 \u00b0C",
+        "50C",
+        "50 C"
+      ],
+      "q": "At what maximum temperature must heated water be delivered to sanitary fixtures used for personal hygiene under Australian plumbing requirements?"
+    },
+    {
+      "item_id": "shed_exempt",
+      "doc": "epl",
+      "prior_strength": 2,
+      "proximity": "far",
+      "domain": "planning",
+      "parametric_answer": "20 square metres",
+      "alt_answers": [
+        "20m2",
+        "20 m2",
+        "20sqm",
+        "20 sqm"
+      ],
+      "q": "What is the maximum floor area of a garden shed that can be built as exempt development in NSW without approval?"
+    },
+    {
+      "item_id": "trench_depth",
+      "doc": "epl",
+      "prior_strength": 2,
+      "proximity": "near",
+      "domain": "work health and safety",
+      "parametric_answer": "1.5 metres",
+      "alt_answers": [
+        "1.5m",
+        "1.5 m"
+      ],
+      "q": "At what depth does an excavation trench become high risk construction work requiring shoring or benching?"
+    }
+  ]
+}
