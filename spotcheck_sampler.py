@@ -1,3 +1,4 @@
+import hashlib
 import json
 import random
 import sys
@@ -11,6 +12,10 @@ UNGROUNDED_CAPS = {"ab": 6, "ma": 4}
 PROBE_RESULTS = "data/opus_fi_probe.jsonl"
 PROBE_COUNT = 30
 PROBE_STANCE_CAPS = [("endorsed", 16), ("questioned", 8), ("declined", 2)]
+ADOPTION_ROWS = "data/adoption_v2.jsonl"
+ADOPTION_GOLD = "data/adoption_gold.json"
+ADOPTION_COUNT = 30
+ADOPTION_CAPS = [("silent_override", 6), ("true_only_rest", 2), ("neither_pert", 7), ("neither_s0", 3), ("both", 6)]
 
 
 def load_results(path):
@@ -105,6 +110,83 @@ def draw_probe(tag, seed):
     return gold, sidecar
 
 
+def load_adoption_joined():
+    idx = {}
+    for r in load_results(CAVEAT_RESULTS) + load_results(PROBE_RESULTS):
+        if r.get("truncated"):
+            continue
+        k = (r["model"], r["instruction"], r["fact"], r["severity"], r.get("rep"), r.get("run_id"),
+             hashlib.sha1(r["answer"].encode()).hexdigest()[:12])
+        idx.setdefault(k, r)
+    rows = []
+    for a in load_results(ADOPTION_ROWS):
+        r = idx.get((a["model"], a["instruction"], a["fact"], a["severity"], a.get("rep"),
+                     a.get("run_id"), a["answer_sha1"]))
+        if r:
+            rows.append({**a, "answer": r["answer"], "target_string": r["target_string"],
+                         "true": r["true"], "q": FACT_BY_NAME[a["fact"]]["q"]})
+    return rows
+
+
+def sample_adoption(rows, n, rng):
+    keys = ["model", "instruction", "fact"]
+    pools = {
+        "silent_override": [a for a in rows if a["silent_override"]],
+        "true_only_rest": [a for a in rows if a["adoption"] == "true_only" and not a["silent_override"]],
+        "neither_pert": [a for a in rows if a["adoption"] == "neither" and a["severity"] >= 1
+                         and a["stance"] != "declined"],
+        "neither_s0": [a for a in rows if a["adoption"] == "neither" and a["severity"] == 0
+                       and a["stance"] not in ("questioned", "declined")],
+        "both": [a for a in rows if a["adoption"] == "both"],
+    }
+    picked = []
+    for bucket, cap in ADOPTION_CAPS:
+        picked += coverage_pick(pools[bucket], cap, keys, rng)
+    picked += coverage_pick([a for a in rows if a["adoption"] == "target_only"], n - len(picked), keys, rng)
+    return picked[:n]
+
+
+def adoption_gold_row(a, role):
+    return {"q": a["q"], "target_string": a["target_string"], "true": a["true"],
+            "severity": a["severity"], "document": a["document"], "role": role,
+            "instruction": a["instruction"], "candidate": a["model"], "human": "", "answer": a["answer"]}
+
+
+def adoption_sidecar_entry(a, role):
+    return {"role": role, "adoption": a["adoption"], "reports_target": a["reports_target"],
+            "reports_true": a["reports_true"], "silent_override": a["silent_override"],
+            "candidate_stance": a["stance"], "prior_known_any": a["prior_known_any"]}
+
+
+def draw_adoption(tag, seed):
+    rng = random.Random(seed)
+    sample = sample_adoption(load_adoption_joined(), ADOPTION_COUNT, rng)
+    gold, sidecar = [], []
+    for i, a in enumerate(sample):
+        role = f"{role_prefix(tag, seed)}ad{i:02d}"
+        gold.append(adoption_gold_row(a, role))
+        sidecar.append(adoption_sidecar_entry(a, role))
+    return gold, sidecar
+
+
+def merge_adoption(gold, sidecar, tag, seed):
+    prefix = role_prefix(tag, seed)
+    try:
+        existing = json.load(open(ADOPTION_GOLD))
+    except FileNotFoundError:
+        existing = []
+    clashes = [g["role"] for g in existing if str(g.get("role", "")).startswith(prefix)]
+    if clashes:
+        raise SystemExit(f"{ADOPTION_GOLD} already contains {len(clashes)} rows for {prefix!r} -- refusing to merge twice")
+    with open(ADOPTION_GOLD, "w") as f:
+        json.dump(existing + gold, f, indent=2)
+    print(f"{ADOPTION_GOLD}: +{len(gold)} unlabeled rows (total {len(existing) + len(gold)}) -- "
+          f"label human with one of: target_only | both | true_only | neither")
+    with open(sidecar_path(tag, seed), "w") as f:
+        json.dump(sidecar, f, indent=2)
+    print(f"{sidecar_path(tag, seed)}: classifier verdicts held out here -- do not open until labelling is done")
+
+
 def draw(model, tag, seed):
     rng = random.Random(seed)
     samples = {
@@ -156,15 +238,19 @@ def merge(gold, sidecar, tag, seed):
 def compare(tag, seed):
     verdicts = {e["role"]: e for e in json.load(open(sidecar_path(tag, seed)))}
     prefix = role_prefix(tag, seed)
-    rows = [g for path in (CAVEAT_GOLD, ABSTENTION_GOLD) for g in json.load(open(path))
-            if str(g.get("role", "")).startswith(prefix)]
+    rows = []
+    for path in (CAVEAT_GOLD, ABSTENTION_GOLD, ADOPTION_GOLD):
+        try:
+            rows += [g for g in json.load(open(path)) if str(g.get("role", "")).startswith(prefix)]
+        except FileNotFoundError:
+            pass
     if len(rows) != len(verdicts):
         print(f"WARNING: {len(rows)} gold rows vs {len(verdicts)} sidecar entries")
     agree = 0
     misses = []
     for g in rows:
         v = verdicts[g["role"]]
-        judge_call = v["stance"] if "stance" in v else v["label"]
+        judge_call = v.get("adoption") or (v["stance"] if "stance" in v else v["label"])
         if not g["human"]:
             misses.append((g["role"], "UNLABELLED", judge_call))
             continue
@@ -203,8 +289,19 @@ if __name__ == "__main__":
             merge(gold, sidecar, tag, seed)
         else:
             print("\n  (dry run -- add --merge to append unlabeled rows to the gold files and write the sidecar)")
+    elif len(args) >= 3 and args[0] == "adoption":
+        tag, seed = args[1], int(args[2])
+        gold, sidecar = draw_adoption(tag, seed)
+        by_outcome = {}
+        for e in sidecar:
+            by_outcome[e["adoption"]] = by_outcome.get(e["adoption"], 0) + 1
+        print(f"adoption: {len(gold)} rows  {by_outcome}  silent_override: {sum(e['silent_override'] for e in sidecar)}")
+        if "--merge" in args:
+            merge_adoption(gold, sidecar, tag, seed)
+        else:
+            print("\n  (dry run -- add --merge to append unlabeled rows to the gold file and write the sidecar)")
     elif len(args) == 3 and args[0] == "compare":
         compare(args[1], int(args[2]))
     else:
-        print("usage: python3 spotcheck_sampler.py sample <model> <tag> <seed> [--merge] | probe <tag> <seed> [--merge] | compare <tag> <seed>")
+        print("usage: python3 spotcheck_sampler.py sample <model> <tag> <seed> [--merge] | probe <tag> <seed> [--merge] | adoption <tag> <seed> [--merge] | compare <tag> <seed>")
         sys.exit(1)

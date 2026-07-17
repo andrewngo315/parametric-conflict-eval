@@ -1,10 +1,10 @@
 # Results
 
-**Models tested:** gpt-4o-mini (gpt-4o-mini-2024-07-18), gpt-5.4-nano (gpt-5.4-nano-2026-03-17), claude-sonnet-5 (resolved alias), gpt-5.6-terra (resolved alias), claude-haiku-4-5 (claude-haiku-4-5-20251001), N=3 per cell; the seeded consent cells are N=8. (legacy, budget, two frontier, and a second Anthropic model at the small tier) claude-opus-4-8 (resolved alias) joins under FLAG_INVITING only at N=1 -- Section 14.
-**Judge:** GPT-5.4-mini (gpt-5.4-mini-2026-03-17): caveat stance kappa 0.97 / corroboration 0.90, 0/30 anchors misjudged, 228-row human-labelled gold; abstention kappa 0.97, 0/54 anchors misjudged, 140-row human-labelled gold.
-**Certification gate**: zero anchor misses AND kappa >= 0.80.
+**Models tested:** gpt-4o-mini (gpt-4o-mini-2024-07-18), gpt-5.4-nano (gpt-5.4-nano-2026-03-17), claude-sonnet-5 (resolved alias), gpt-5.6-terra (resolved alias), claude-haiku-4-5 (claude-haiku-4-5-20251001) (legacy, budget, two frontier, and a second Anthropic model at the small tier) + claude-opus-4-8 (resolved alias) joins under FLAG_INVITING only at N=1.   
+**Judge:** GPT-5.4-mini (gpt-5.4-mini-2026-03-17): caveat stance kappa 0.97 / corroboration 0.90, 0/30 anchors misjudged, 228-row human-labelled gold; abstention kappa 0.97, 0/54 anchors misjudged, 140-row human-labelled gold.  
+**Certification gate**: zero anchor misses AND kappa >= 0.80.  
 
-Error-flagging rate vs perturbation severity, five instruction lines faceted by model
+
 *Regenerate offline with `python3 plot_results.py`.*
 
 ## 1. Key Terms
@@ -21,6 +21,8 @@ Definitions of the outcomes are as follows:
 - does not question or decline the unperturbed value (S0)
 - raises a plausibility concern on extreme perturbations (S3-S5)
 - faithfully abstains when the answer is absent from the document
+
+**7. Adoption:** which value the answer actually contains, matched lexically against the document's value and the true value: target_only, true_only, both, or neither. This is the dependent variable of the knowledge-conflict literature (ClashEval, ConflictBank, RGB's error correction), measured here on the same rows as the speech acts. **Silent override** = true_only on a perturbed row with no question raised and no decline: the true value substituted without telling the user. Classifier validation in Section 11; regenerate with `python3 harness.py adoption` (per-row output `data/adoption_v2.jsonl`).
 
 System instructions are shortened as such:
 SE = **SOURCE_EXCLUSIVE**
@@ -50,6 +52,26 @@ One further term appears in the tables below: **parametric leakage**, the rate a
 - Haiku 4.5 is the only model in the study that flags any errors under SE. For every other model, SE suppresses flagging to zero.
 
 **Detection-mechanism note:** contradiction sensitivity pools two ways a model can catch a perturbation — world-knowledge implausibility, and document-internal contradiction. One fact (minors_section) is internally detectable at every severity: the licence's legislative header enumerates "...51 and 121 of the Liquor Act 2007", which the perturbation does not touch, so the perturbed bullet contradicts the document itself and no parametric knowledge is required to flag it. A programmatic check (reported under `analysis`) confirms no other fact leaves an answer-bearing site intact under perturbation. Excluding minors_section changes every model x instruction flag rate by at most 0.008 — no table cell above moves at two decimal places — so the reported rates are not driven by internal cross-referencing. Softer internal cues (a section-number format range, or the surviving Christmas Day "12:00 noon" beside a perturbed Good Friday time) remain and are not controlled for.
+
+**Adoption complement:** the flag rates above say nothing about which value flowed into the answer -- the adoption outcome (Key Terms 7) closes that gap on the same rows.
+
+- **The SE wall is compliant repetition, not silent correction.** Sonnet 5 under SE reports the perturbed value verbatim in 0.98 of S1-5 rows with zero true_only outcomes: the zero flag rate above sits on top of full adoption of the error, not hidden substitution underneath.
+- **Silent parametric substitution does not occur where the capacity for it is proven.** Conditioning on the closed-book prior probe (`data/prior_probe_results.jsonl`): on the 2,500 perturbed rows where the probe shows the model holds the true value (any of 3 reps; majority aggregation agrees), there are zero true_only outcomes -- no model, under any instruction, ever swaps in the answer it knows without saying so. Distrust of a document value surfaces as flagging or abstention, never as a quiet answer-swap.
+
+
+| aggregation | prior status | n    | true_only  | silent_override |
+| ----------- | ------------ | ---- | ---------- | --------------- |
+| any-rep     | prior known  | 2500 | 0.000 (0)  | 0.000 (0)       |
+| any-rep     | prior absent | 7700 | 0.011 (84) | 0.009 (67)      |
+| majority    | prior known  | 1800 | 0.000 (0)  | 0.000 (0)       |
+| majority    | prior absent | 8400 | 0.010 (84) | 0.008 (67)      |
+
+
+- **Every apparent override is the document talking, not memory.** All 67 silent overrides sit on prior-absent pairs: 37 are minors_section (the internally anchored fact above -- the surviving legislative header supplies the answer), closure_period rows derive the duration from the surviving 4:00 AM-10:00 AM interval, and the tree_limbs rows read as approximate-range sanitization (the model cannot recall "two metres" closed-book but knows limb clearances are metres-scale, not "two hundred metres"). The same mechanism split as the detection-mechanism note, with the prior probe as the discriminator.
+- **Adoption and flagging decouple exactly where the speech acts say they should.** The `both` outcome (document value reported alongside the true one) tracks the flag rate -- Sonnet 5 FI 0.46, Opus FI 0.45, near zero under SE: the report-and-contrast pattern FLAG_INVITING is designed to elicit.
+- A related sanitization behaviour is invisible to both adoption and flag rates: in three spot-checked rows the model echoed an absurd document time with the meridiem flipped (document "10.00pm" for a construction start, answer "10.00am") -- a plausible third value, silently.
+
+Prior-known coverage is thin and skewed (any-rep pairs: nano 10, terra 8, mini 6, Sonnet 5 3, Haiku 1 of 24 facts each), so the zero is best-evidenced for the OpenAI models; the probe's exact-string criterion means "prior absent" includes weak approximate priors (tree_limbs); Opus rows are excluded from the conditioning (never probed).
 
 ## 3. Clean specificity
 
@@ -111,17 +133,17 @@ Key: False endorsement / false corroboration
 | gpt-5.6-terra    | 0.00 / 0.00 | 0.00 / 0.00 | 0.00 / 0.00 | 0.00 / 0.00 | 0.00 / 0.00 |
 
 
-Sonnet 5 x FI endorsements per severity
+Sonnet 5 x FI endorsements per severity. The d' column is a signal-detection decomposition (added after external review): rates are corrected (x+0.5)/(n+1) before z-transforming, and d'(s) = z(E|S0) - z(E|Ss), where higher d' means the model treats perturbed values less like clean ones; [] is a 95% cluster bootstrap over facts (10,000 resamples, fixed seed); reproduce with `python3 harness.py analysis`.
 
 
-| severity | endorsed | rate [Wilson 95%] |
-| -------- | -------- | ----------------- |
-| S0       | 60/72    | 0.83 [0.73,0.90]  |
-| S1       | 56/72    | 0.78 [0.67,0.86]  |
-| S2       | 25/72    | 0.35 [0.25,0.46]  |
-| S3       | 7/72     | 0.10 [0.05,0.19]  |
-| S4       | 0/72     | 0.00 [0.00,0.05]  |
-| S5       | 0/72     | 0.00 [0.00,0.05]  |
+| severity | endorsed | rate [Wilson 95%] | d'                  |
+| -------- | -------- | ----------------- | ------------------- |
+| S0       | 60/72    | 0.83 [0.73,0.90]  | --                  |
+| S1       | 56/72    | 0.78 [0.67,0.86]  | +0.20 [-0.40,+0.77] |
+| S2       | 25/72    | 0.35 [0.25,0.46]  | +1.34 [+0.75,+2.04] |
+| S3       | 7/72     | 0.10 [0.05,0.19]  | +2.22 [+1.61,+3.05] |
+| S4       | 0/72     | 0.00 [0.00,0.05]  | +3.41 [+3.01,+3.90] |
+| S5       | 0/72     | 0.00 [0.00,0.05]  | +3.41 [+3.01,+3.90] |
 
 
 **Key Findings:** 
@@ -130,7 +152,14 @@ Sonnet 5 x FI endorsements per severity
 - Under FI, 24% of Sonnet 5's perturbed answers were endorsements (88/360) and 20% were *corroborated* endorsements (73/360). Of the 73, 63 were justified generically (the value "appears standard/reasonable") and 10 cited a named external authority (2.8% of perturbed answers). The latter cases are the most serious ones; this involves the model invoking real standards (e.g. "Planning for Bushfire Protection 2019") to vouch for a perturbed value, a failure of both document grounding and parametric knowledge accuracy. 
 - The endorsements are concentrated at low severity: 0.78 at S1 and 0.35 at S2, falling to 0.10 at S3 and zero at S4-S5 (per-severity table above). Sonnet 5 also endorses the unperturbed value 83% of the time under FI, so the behaviour is better described as vouching for any value it deems plausible when the instruction invites a plausibility assessment. S1-S2 perturbations (1.25x to 3.5x) sit inside that plausibility window and are not reliably detectable by any model.
   - The failure is not endorsement of absurd values, which never happened in the data. It is confident corroboration language, sometimes citing named authorities, applied to errors the model cannot actually rule out.
-- This behaviour was only observed in Sonnet 5. Haiku 4.5, the second Anthropic model in the roster, does not reproduce it (1 confirmed endorsement in 1,800 and a 0/72 S0 endorsement rate under FI, against Sonnet 5's 0.83) — so among the grid models, the behaviour is specific to Sonnet 5 rather than Anthropic-family-wide. An FI-only probe of claude-opus-4-8 subsequently found the behaviour DOES recur at the Anthropic frontier tier, at half Sonnet 5's base propensity and without the named-authority component (Section 14).
+- This behaviour was only observed in Sonnet 5. Haiku 4.5, the second Anthropic model in the roster, does not reproduce it (1 confirmed endorsement in 1,800 and a 0/72 S0 endorsement rate under FI, against Sonnet 5's 0.83) — so among the grid models, the behaviour is specific to Sonnet 5 rather than Anthropic-family-wide. An FI-only probe of claude-opus-4-8 subsequently found the behaviour DOES recur at the Anthropic frontier tier, at half Sonnet 5's base propensity and without the named-authority component (Section 12).
+
+**Propensity vs discrimination:** the endorsement rate conflates two properties -- how readily a model vouches for values at all (propensity, its endorsement rate on the unperturbed S0 control), and how much that behaviour changes when the value is actually wrong (discrimination). The d' column in the per-severity table above separates them.
+
+- At S1 the d' interval covers zero: Sonnet 5's endorsement behaviour on a 1.25-1.5x perturbed value is statistically indistinguishable from its behaviour on the correct value. The S1 failure is not recklessness toward detected errors -- the model cannot see the error and vouches at its base propensity (0.83).
+- Discrimination rises steeply from S2 (d' 1.34) and saturates by S4; the danger band is exactly the plausibility window where discrimination is absent or partial while propensity stays high.
+- The decomposition reframes the terra contrast: terra endorsed nothing clean or perturbed (zero propensity), so its clean sheet above reflects an answer style in which false corroboration is structurally unavailable, not necessarily sharper error detection (its detection is measured on the flagging axis in Sections 2 and 9).
+- The remaining nonzero cells (Sonnet SE+FI 2/72 at S1, Haiku FI 2/72 at S4, nano WG 1/102 at S5) are too sparse for a meaningful d'.
 
 ## 6. Situated faithfulness
 
@@ -311,9 +340,27 @@ Key: questioned = raised doubt about the value; endorsed = actively vouched for 
 **Key Findings:** 
 
 - The only instance in which significant levels of endorsements were observed was Sonnet 5 on the FI system instruction. Every other combination of model and instruction observed very little if any endorsements at all.
-- GPT-5.6-terra, the second frontier model, endorsed nothing at any severity under any instruction, so endorsement is not a behaviour that arrives with frontier capability. Haiku 4.5, the second Anthropic model, endorsed almost nothing (2/1,800, one of them a judge miss — Section 11), so among the grid models the behaviour is specific to Sonnet 5 rather than family-wide. The Opus 4.8 FI-only probe (Section 14) later found endorsement recurs at the Anthropic frontier tier — the trait now reads as capability x family (present in both frontier Anthropic models, absent in Haiku and in every OpenAI model) rather than one model's quirk. 
+- GPT-5.6-terra, the second frontier model, endorsed nothing at any severity under any instruction, so endorsement is not a behaviour that arrives with frontier capability. Haiku 4.5, the second Anthropic model, endorsed almost nothing (2/1,800, one of them a judge miss — Section 11), so among the grid models the behaviour is specific to Sonnet 5 rather than family-wide. The Opus 4.8 FI-only probe (Section 12) later found endorsement recurs at the Anthropic frontier tier — the trait now reads as capability x family (present in both frontier Anthropic models, absent in Haiku and in every OpenAI model) rather than one model's quirk. 
 - As discussed in Section 5, arguably the most dangerous behaviour observed throughout the results can be seen here, where values that were intentionally perturbed were actively endorsed by Sonnet 5. Most were justified generically as appearing standard, but 10 instances cited named standards that are real but whose claimed support for the perturbed value is hallucinated. The endorsements sit almost entirely at S1-S2, the perturbations small enough to pass a plausibility check.
   - This can lead to document-grounded QA misleading users into applying incorrect information, especially when the model uses external standards to justify its endorsements even when the standards are applied incorrectly. Users are less likely to verify information if an external standard is confidently cited by a model.
+
+**Detection thresholds in ratio units (added after external review; reproduce with `python3 harness.py analysis`):** each perturbation step carries a magnitude ratio (1.25x to 50,000x the true value). Fitting a logistic curve of flagging probability against log10(ratio) per model x instruction gives a psychometric threshold: **ratio50, the perturbation size at which the model flags half the time.** This treats error size as a continuous variable rather than the ordinal severity rungs, which partially addresses the severity-standardisation limitation. S0 rows (ratio 1) anchor the false-alarm end; the one ratio-less fact (saturday_hours, bounded) is excluded; ratio50 is reported only where the fitted curve crosses 0.5 inside the observed range. [] is a 95% cluster bootstrap over facts (2,000 resamples, fixed seed). Ratios are fact-confounded (each fact contributes its own ratio sequence), so intervals lean on the cluster bootstrap.
+
+
+| model            | SE          | FI                  | WG                  | SE+FI             | AUDIT               |
+| ---------------- | ----------- | ------------------- | ------------------- | ----------------- | ------------------- |
+| gpt-4o-mini      | no crossing | x1996 [x472,x10892] | no crossing         | no crossing       | no crossing         |
+| gpt-5.4-nano     | no crossing | x2190 [x649,x16011] | no crossing         | no crossing       | no crossing         |
+| claude-haiku-4-5 | no crossing | x91 [x46,x192]      | x4559 [x882,x27609] | x398 [x135,x1621] | x4213 [x743,x28215] |
+| claude-sonnet-5  | no crossing | x3.3 [x2.3,x4.8]    | x977 [x377,x2867]   | x8.7 [x5.6,x13.7] | x66 [x34,x144]      |
+| gpt-5.6-terra    | no crossing | x18 [x8.6,x39]      | no crossing         | x119 [x67,x236]   | no crossing         |
+
+
+"No crossing" means the fitted curve never reaches 50% within the observed range (max x50,000) -- the SE column restates the suppression wall in threshold units. In three cells a small share of bootstrap resamples also fail to cross and are excluded from the interval (nano FI 0.3%, Haiku WG 1.4%, Haiku AUDIT 1.6%); everywhere else every resample crosses.
+
+- Under FI, one number per model now summarises detection sensitivity: Sonnet 5 flags majority-reliably from ~3.3x, terra from ~18x, Haiku from ~91x, and the legacy/budget models only near ~2000x.
+- The threshold quantifies what each instruction change costs: adding source-exclusivity to FI moves Sonnet 5's threshold from x3.3 to x8.7 (~~2.6x less sensitive) and terra's from x18 to x119 (~~6.6x) -- the same SE+FI conflict Section 6 describes, now in error-size units.
+- Instruction wording moves the threshold by orders of magnitude within a fixed model (Sonnet 5: x3.3 FI / x66 AUDIT / x977 WG), a larger effect than the model gap under any single instruction among the three models that cross under multiple instructions.
 
 ## 10. Per-document effects
 
@@ -406,63 +453,15 @@ One structural asymmetry is disclosed rather than controlled: the judge (GPT-5.4
 
 As a robustness check on the Section 5 endorsement contrast specifically, a second judge from the candidate's own model family (claude-opus-4-8) was certified on the same 198-row human gold under the identical prompt and gate (stance kappa 0.98 / corroboration 0.94, 0/30 anchors misjudged) and re-scored all 88 of Sonnet 5's endorsed FI rows, 88 matched non-endorsed Sonnet FI rows, and 90 terra FI perturbed rows (seed 20260717). It confirmed 87/88 endorsements (the sole disagreement softened endorsed to declined), found zero endorsements the primary judge had missed in the controls, and agreed 90/90 on terra with zero endorsements — so the 88-vs-0 contrast is not an artifact of the OpenAI judge, and the confirming judge's family bias, if any, runs toward the candidate it convicted. A claude-haiku-4-5 attempt at the same certification failed the gate (6/30 anchor misses, all from treating value extremeness as stance evidence in violation of the prompt's explicit rule — the same disposition Section 2 reports for Haiku as a candidate), so its verdicts were discarded; the judge prompt is not portable below a capability threshold.
 
-The cross-family check covers the caveat/endorsement judge only: the abstention and matched-absence verdicts rest on the primary same-provider judge alone, certified against human-labelled gold and blind spot-checked but not re-scored by a second family. The check also cannot extend to claude-opus-4-8 as a candidate (Section 14): the second judge IS claude-opus-4-8, and a model cannot second-judge its own conviction, so the Opus endorsement finding rests on the primary judge plus its own blind spot-check.
+The cross-family check covers the caveat/endorsement judge only: the abstention and matched-absence verdicts rest on the primary same-provider judge alone, certified against human-labelled gold and blind spot-checked but not re-scored by a second family. The check also cannot extend to claude-opus-4-8 as a candidate (Section 12): the second judge IS claude-opus-4-8, and a model cannot second-judge its own conviction, so the Opus endorsement finding rests on the primary judge plus its own blind spot-check.
 
-The Opus probe spot check (30 rows, seed 20260717, drawn blind with judge verdicts held out in a sidecar) surfaced a new characterizable judge error class: on Opus 4.8's citation-dense answer style, the judge over-calls named_authority corroboration by treating the document's own instrument references (its Planning Agreement clause, its legislative header) as external authorities. All 3 of the probe's perturbed named-authority calls were refuted by the blind labels; stance agreement was 29/30 (the sole miss a questioned-to-declined softening) with all 16 sampled endorsements confirmed, and corroboration agreement 24/30 with every residual disagreement a judge error that overstates rather than flatters Opus. During labelling three human corroboration labels were corrected from none to generic for consistency with the gold's own exemplars (previous values preserved in human_corroboration_prev). Because of the named-authority error class, Section 14 reports Opus corroboration from the blind human labels, not the judge. The judge was recertified over the expanded 228-row gold and passed the gate: caveat stance kappa 0.97 / corroboration 0.90, 0/30 anchors misjudged.
+The Opus probe spot check (30 rows, seed 20260717, drawn blind with judge verdicts held out in a sidecar) surfaced a new characterizable judge error class: on Opus 4.8's citation-dense answer style, the judge over-calls named_authority corroboration by treating the document's own instrument references (its Planning Agreement clause, its legislative header) as external authorities. All 3 of the probe's perturbed named-authority calls were refuted by the blind labels; stance agreement was 29/30 (the sole miss a questioned-to-declined softening) with all 16 sampled endorsements confirmed, and corroboration agreement 24/30 with every residual disagreement a judge error that overstates rather than flatters Opus. During labelling three human corroboration labels were corrected from none to generic for consistency with the gold's own exemplars (previous values preserved in human_corroboration_prev). Because of the named-authority error class, Section 12 reports Opus corroboration from the blind human labels, not the judge. The judge was recertified over the expanded 228-row gold and passed the gate: caveat stance kappa 0.97 / corroboration 0.90, 0/30 anchors misjudged.
 
-## 12. Exploratory: endorsement propensity vs discrimination
+The adoption classifier (Key Terms 7, Section 2) is lexical, not judge-based, and was validated separately with two instruments. First, an S0 canary: on answered unperturbed rows the answer should nearly always contain the document's value, so the rate at which the matcher finds neither value estimates its false-negative rate -- 17/2029 = 0.008 after variant handling (0.060 for the raw matcher; variants cover unit spacing and spellings, number words, time punctuation, thousands separators, parenthetical number forms, markdown emphasis). Second, a 30-row blind spot-check (seed 20260717, classifier verdicts held out in `data/spotcheck_sidecar_adopt_20260717.json`, stratified toward the hard buckets: silent overrides, neither rows, S0 canary misses). Against the final human labels (`data/adoption_gold.json`) the pre-fix classifier scored 24/30; the misses decomposed into four formatting classes (duration hyphens "6-hour", comma-grouped numbers "1:1,000,000", parenthetical forms "fifteen (15) months", underscore italics), which were fixed, after which the classifier scores 29/30 on the same sample. That figure is in-sample; the independent evidence of improvement is the canary falling 0.060 to 0.008. The sole residual miss class is fully verbalized numbers ("one per one million patrons"). Eight human labels were corrected during adjudication (two mislabels, three vocabulary fixes, three flipped-meridiem rows ruled neither under the containment convention); previous values preserved in `human_prev`.
 
-*Post-hoc analysis added 2026-07-17 after external review; not part of the pre-registered analysis. Reproduced offline by `python3 harness.py analysis`.*
+## 12. Opus 4.8 FI-only endorsement probe
 
-The Section 5 endorsement rate conflates two properties: how readily a model vouches for values at all (propensity -- its endorsement rate on the unperturbed S0 control), and how much that behaviour changes when the value is actually wrong (discrimination). A signal-detection split separates them: rates are corrected (x+0.5)/(n+1) before z-transforming, and d'(s) = z(E|S0) - z(E|Ss), where higher d' means the model treats perturbed values less like clean ones. [] is a 95% cluster bootstrap over facts (10,000 resamples, fixed seed).
-
-Sonnet 5 under FI (the only model x instruction cell with a non-trivial endorsement rate; 21 of 25 cells produce zero endorsements anywhere):
-
-
-| severity | E (endorse rate) | d'                  |
-| -------- | ---------------- | ------------------- |
-| S0       | 0.83 (60/72)     | --                  |
-| S1       | 0.78 (56/72)     | +0.20 [-0.40,+0.77] |
-| S2       | 0.35 (25/72)     | +1.34 [+0.75,+2.04] |
-| S3       | 0.10 (7/72)      | +2.22 [+1.61,+3.05] |
-| S4       | 0.00 (0/72)      | +3.41 [+3.01,+3.90] |
-| S5       | 0.00 (0/72)      | +3.41 [+3.01,+3.90] |
-
-
-**Key findings:**
-
-- At S1 the d' interval covers zero: Sonnet 5's endorsement behaviour on a 1.25-1.5x perturbed value is statistically indistinguishable from its behaviour on the correct value. The S1 failure is not recklessness toward detected errors -- the model cannot see the error and vouches at its base propensity (0.83).
-- Discrimination rises steeply from S2 (d' 1.34) and saturates by S4; the danger band is exactly the plausibility window where discrimination is absent or partial while propensity stays high.
-- The decomposition reframes the terra contrast: terra endorsed nothing clean or perturbed (zero propensity), so its clean sheet in Section 5 reflects an answer style in which false corroboration is structurally unavailable, not necessarily sharper error detection (its detection is measured on the flagging axis in Sections 2 and 13).
-- The remaining nonzero cells (Sonnet SE+FI 2/72 at S1, Haiku FI 2/72 at S4, nano WG 1/102 at S5) are too sparse for a meaningful d'.
-
-## 13. Exploratory: detection thresholds in ratio units
-
-*Post-hoc analysis added 2026-07-17 after external review; not part of the pre-registered analysis. Reproduced offline by `python3 harness.py analysis`.*
-
-Each perturbation step carries a magnitude ratio (1.25x to 50,000x the true value). Fitting a logistic curve of flagging probability against log10(ratio) per model x instruction gives a psychometric threshold: **ratio50, the perturbation size at which the model flags half the time.** This treats error size as a continuous variable rather than the ordinal severity rungs, which partially addresses the severity-standardisation limitation. S0 rows (ratio 1) anchor the false-alarm end; the one ratio-less fact (saturday_hours, bounded) is excluded; ratio50 is reported only where the fitted curve crosses 0.5 inside the observed range. [] is a 95% cluster bootstrap over facts (2,000 resamples, fixed seed). Ratios are fact-confounded (each fact contributes its own ratio sequence), so intervals lean on the cluster bootstrap.
-
-
-| model            | SE          | FI                  | WG                  | SE+FI             | AUDIT               |
-| ---------------- | ----------- | ------------------- | ------------------- | ----------------- | ------------------- |
-| gpt-4o-mini      | no crossing | x1996 [x472,x10892] | no crossing         | no crossing       | no crossing         |
-| gpt-5.4-nano     | no crossing | x2190 [x649,x16011] | no crossing         | no crossing       | no crossing         |
-| claude-haiku-4-5 | no crossing | x91 [x46,x192]      | x4559 [x882,x27609] | x398 [x135,x1621] | x4213 [x743,x28215] |
-| claude-sonnet-5  | no crossing | x3.3 [x2.3,x4.8]    | x977 [x377,x2867]   | x8.7 [x5.6,x13.7] | x66 [x34,x144]      |
-| gpt-5.6-terra    | no crossing | x18 [x8.6,x39]      | no crossing         | x119 [x67,x236]   | no crossing         |
-
-
-"No crossing" means the fitted curve never reaches 50% within the observed range (max x50,000) -- the SE column restates the suppression wall in threshold units. In three cells a small share of bootstrap resamples also fail to cross and are excluded from the interval (nano FI 0.3%, Haiku WG 1.4%, Haiku AUDIT 1.6%); everywhere else every resample crosses.
-
-**Key findings:**
-
-- Under FI, one number per model now summarises detection sensitivity: Sonnet 5 flags majority-reliably from ~3.3x, terra from ~18x, Haiku from ~91x, and the legacy/budget models only near ~2000x.
-- The threshold quantifies what each instruction change costs: adding source-exclusivity to FI moves Sonnet 5's threshold from x3.3 to x8.7 (~2.6x less sensitive) and terra's from x18 to x119 (~6.6x) -- the same SE+FI conflict Section 6 describes, now in error-size units.
-- Instruction wording moves the threshold by orders of magnitude within a fixed model (Sonnet 5: x3.3 FI / x66 AUDIT / x977 WG), a larger effect than the model gap under any single instruction among the three models that cross under multiple instructions.
-
-## 14. Opus 4.8 FI-only endorsement probe
-
-*Probe run 2026-07-17, added after external review raised the frontier-Anthropic question; it postdates the run manifest, so its design differences from the grid are listed here. Design: claude-opus-4-8, FLAG_INVITING only, N=1 (144 rows, ~US$4), staged so ambiguous results could escalate to N=3 via resume at no wasted spend. The fact, not the repetition, is the experimental unit (the same within-fact correlation that set the grid's N=3), so N=1 still yields 24 independent facts per severity. Adaptive thinking was enabled explicitly for comparability: Sonnet 5 runs adaptive thinking by default when the parameter is omitted, while Opus 4.8 omission would have run thinking-off. All other candidate parameters match the grid. Results in `data/opus_fi_probe.jsonl`; 144/144 succeeded, 0 truncations.*
+*Probe run 2026-07-17, added after external review raised the frontier-Anthropic question. Its design is recorded in the run manifest's `probes` block (entry added 2026-07-17 -- the probe still postdates the original grid manifest, and the entry says so); its design differences from the grid are listed here. Design: claude-opus-4-8, FLAG_INVITING only, N=1 (144 rows, ~US$4), staged so ambiguous results could escalate to N=3 via resume at no wasted spend. The fact, not the repetition, is the experimental unit (the same within-fact correlation that set the grid's N=3), so N=1 still yields 24 independent facts per severity. Adaptive thinking was enabled explicitly for comparability: Sonnet 5 runs adaptive thinking by default when the parameter is omitted, while Opus 4.8 omission would have run thinking-off. All other candidate parameters match the grid. Results in `data/opus_fi_probe.jsonl`; 144/144 succeeded, 0 truncations.*
 
 
 | severity | endorse rate     | flag rate        | endorsement d'      |

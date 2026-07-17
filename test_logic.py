@@ -25,6 +25,7 @@ from harness import (wilson_interval, PERTURBATION_LADDERS, SEVERITIES, validate
                      probe_targets, _probe_row,
                      encode_caveat_custom_id, decode_caveat_custom_id,
                      encode_abstention_custom_id, decode_abstention_custom_id,
+                     adoption_outcome, classify_adoption,
                      caveat_wave_plan, abstention_wave_plan, concurrent_map, pilot_selection,
                      _run_anthropic_wave, _chunked_judge_sink, build_manifest,
                      SweepSpec, CAVEAT_SWEEP, ABSTENTION_SWEEP, ABSENCE_SWEEP, _sweep_wave_plan, _run_sweep,
@@ -1392,6 +1393,132 @@ class TestProbeSpotcheckDraw(unittest.TestCase):
         for e in sidecar:
             self.assertIn("stance", e)
             self.assertIn("corroboration", e)
+
+
+class TestAdoptionSpotcheckDraw(unittest.TestCase):
+    def test_draw_is_deterministic_capped_and_blind(self):
+        import os
+        import spotcheck_sampler as sp
+        if not os.path.exists(sp.ADOPTION_ROWS):
+            self.skipTest("adoption rows not generated")
+        g1, s1 = sp.draw_adoption("adopt", 20260717)
+        g2, s2 = sp.draw_adoption("adopt", 20260717)
+        self.assertEqual(g1, g2)
+        self.assertEqual(s1, s2)
+        self.assertEqual(len(g1), sp.ADOPTION_COUNT)
+        roles = [g["role"] for g in g1]
+        self.assertEqual(len(roles), len(set(roles)))
+        self.assertTrue(all(r.startswith("adopt-spotcheck seed20260717 ad") for r in roles))
+        self.assertEqual(sum(e["silent_override"] for e in s1), 6)
+        for g in g1:
+            self.assertEqual(g["human"], "")
+            self.assertNotIn("adoption", g)
+            self.assertNotIn("reports_target", g)
+        for e in s1:
+            self.assertIn("adoption", e)
+            self.assertNotIn("answer", e)
+
+
+class TestAdoption(unittest.TestCase):
+    FACT = {"fact": "grasses", "true": "10cm", "alt_answers": ["10 cm"]}
+
+    def test_target_only(self):
+        rt, rtrue, o = classify_adoption("The passage says the limit is 15cm.", self.FACT, "15cm")
+        self.assertEqual((rt, rtrue, o), (True, False, "target_only"))
+
+    def test_true_only_silent_substitution(self):
+        rt, rtrue, o = classify_adoption("The maximum height is 10cm.", self.FACT, "15cm")
+        self.assertEqual((rt, rtrue, o), (False, True, "true_only"))
+
+    def test_both(self):
+        _, _, o = classify_adoption("The passage states 15cm, though the standard limit is 10cm.", self.FACT, "15cm")
+        self.assertEqual(o, "both")
+
+    def test_neither(self):
+        _, _, o = classify_adoption("NOT IN DOCUMENT", self.FACT, "15cm")
+        self.assertEqual(o, "neither")
+
+    def test_true_value_not_matched_inside_larger_number(self):
+        _, _, o = classify_adoption("The limit is 110cm.", self.FACT, "15cm")
+        self.assertEqual(o, "neither")
+
+    def test_alt_answer_counts_as_true(self):
+        _, _, o = classify_adoption("The limit is 10 cm.", self.FACT, "15cm")
+        self.assertEqual(o, "true_only")
+
+    def test_unperturbed_target_equals_true(self):
+        _, _, o = classify_adoption("The limit is 10cm.", self.FACT, "10cm")
+        self.assertEqual(o, "both")
+
+    def test_case_insensitive(self):
+        _, _, o = classify_adoption("the passage says 15CM.", self.FACT, "15cm")
+        self.assertEqual(o, "target_only")
+
+    def test_outcome_precedence(self):
+        self.assertEqual(adoption_outcome(True, True), "both")
+        self.assertEqual(adoption_outcome(True, False), "target_only")
+        self.assertEqual(adoption_outcome(False, True), "true_only")
+        self.assertEqual(adoption_outcome(False, False), "neither")
+
+    def test_unit_spacing_variant(self):
+        _, _, o = classify_adoption("The maximum height is 10 cm.", self.FACT, "15cm")
+        self.assertEqual(o, "true_only")
+
+    def test_unit_spelling_variant(self):
+        _, _, o = classify_adoption("The limit is 10 centimeters.", self.FACT, "15cm")
+        self.assertEqual(o, "true_only")
+
+    def test_time_punctuation_variant(self):
+        fact = {"fact": "saturday_hours", "true": "1.00pm"}
+        _, _, o = classify_adoption("Hours are permitted until 1:00 PM.", fact, "1.00pm")
+        self.assertEqual(o, "both")
+
+    def test_number_word_variant(self):
+        fact = {"fact": "firebreak_perimeter", "true": "4 metres"}
+        _, _, o = classify_adoption("A firebreak of four metres is required.", fact, "12 metres")
+        self.assertEqual(o, "true_only")
+
+    def test_metre_meter_spelling(self):
+        fact = {"fact": "tree_limbs", "true": "two metres"}
+        _, _, o = classify_adoption("Limbs removed to two meters above ground.", fact, "six metres")
+        self.assertEqual(o, "true_only")
+
+    def test_markdown_bold_stripped(self):
+        fact = {"fact": "minors_section", "true": "Section 121"}
+        _, _, o = classify_adoption("Section **121** of the Liquor Act 2007.", fact, "Section 121000000")
+        self.assertEqual(o, "true_only")
+
+    def test_target_variants_apply_too(self):
+        _, _, o = classify_adoption("The passage says 15 cm.", self.FACT, "15cm")
+        self.assertEqual(o, "target_only")
+
+    def test_variant_expansion_respects_boundaries(self):
+        _, _, o = classify_adoption("The limit is 115 cm.", self.FACT, "15cm")
+        self.assertEqual(o, "neither")
+
+    def test_duration_hyphen_singular(self):
+        fact = {"fact": "closure_period", "true": "6 hours"}
+        _, _, o = classify_adoption("A continuous 6-hour period applies.", fact, "15 hours")
+        self.assertEqual(o, "true_only")
+
+    def test_comma_grouped_number(self):
+        fact = {"fact": "security_ratio", "true": "1:100"}
+        _, _, o = classify_adoption("The ratio stated is 1:1,000,000.", fact, "1:1000000")
+        self.assertEqual(o, "target_only")
+
+    def test_parenthetical_number_form(self):
+        fact = {"fact": "licensee_training", "true": "six (6) months"}
+        _, _, o = classify_adoption("Training must be completed within 15 months.", fact, "fifteen (15) months")
+        self.assertEqual(o, "target_only")
+
+    def test_bare_parenthetical_not_expanded(self):
+        from harness import value_variants
+        self.assertNotIn("2", value_variants("two (2)"))
+
+    def test_underscore_italics_stripped(self):
+        fact = {"fact": "leachate_level", "true": "300mm"}
+        _, _, o = classify_adoption("Must not exceed _300 mm at any time_.", fact, "300mm")
+        self.assertEqual(o, "both")
 
 
 if __name__ == "__main__":

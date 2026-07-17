@@ -528,6 +528,162 @@ def endorsement_breakdown():
             w.writerow([m, i, s] + row + [sum(row)])
     print(f"\n  wrote {ENDORSEMENT_BREAKDOWN_CSV}")
 
+ADOPTION_OUTCOMES = ["target_only", "both", "true_only", "neither"]
+ADOPTION_SIDECAR = "data/adoption_v2.jsonl"
+
+NUMBER_WORDS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
+                "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12"}
+UNIT_FORMS = {"cm": ["cm", "centimetre", "centimetres", "centimeter", "centimeters"],
+              "mm": ["mm", "millimetre", "millimetres", "millimeter", "millimeters"],
+              "m": ["m", "metre", "metres", "meter", "meters"],
+              "hour": ["hour", "hours"], "day": ["day", "days"], "week": ["week", "weeks"],
+              "month": ["month", "months"], "year": ["year", "years"]}
+UNIT_KEY = {f: k for k, forms in UNIT_FORMS.items() for f in forms}
+
+def _number_word_variants(s):
+    out = {s}
+    low = s.lower()
+    for w, d in NUMBER_WORDS.items():
+        if low.startswith(w + " "):
+            out.add(d + s[len(w):])
+        if low.startswith(d + " "):
+            out.add(w + s[len(d):])
+    return out
+
+def value_variants(s):
+    base = set(_number_word_variants(s.strip()))
+    for v in list(base):
+        m = re.fullmatch(r"([A-Za-z]+)\s?\((\d+)\)\s?(.+)", v)
+        if m:
+            for num in (m.group(1), m.group(2)):
+                base.add(num + " " + m.group(3))
+    for v in list(base):
+        if "," in v:
+            base.add(v.replace(",", ""))
+        base.add(re.sub(r"\d{4,}", lambda d: f"{int(d.group(0)):,}", v))
+    out = set()
+    for v in base:
+        out.add(v)
+        m = re.fullmatch(r"(\d+(?:\.\d+)?|[A-Za-z]+)[\s-]?([a-zA-Z]+)", v)
+        if m and m.group(2).lower() in UNIT_KEY and (m.group(1).lower() in NUMBER_WORDS
+                                                    or re.fullmatch(r"\d+(?:\.\d+)?", m.group(1))):
+            seps = ["", " ", "-"] if m.group(1)[0].isdigit() else [" ", "-"]
+            for form in UNIT_FORMS[UNIT_KEY[m.group(2).lower()]]:
+                for sep in seps:
+                    out.add(m.group(1) + sep + form)
+        t = re.fullmatch(r"(\d{1,2})[.:](\d{2})\s?(am|pm)", v, re.IGNORECASE)
+        if t:
+            h, mins, ap = t.groups()
+            for p in [".", ":"]:
+                for sep in ["", " "]:
+                    out.add(h + p + mins + sep + ap)
+    return sorted(out)
+
+def adoption_outcome(reports_target, reports_true):
+    if reports_target and reports_true:
+        return "both"
+    if reports_target:
+        return "target_only"
+    if reports_true:
+        return "true_only"
+    return "neither"
+
+def classify_adoption(answer, fact, target_string):
+    text = answer.replace("*", "").replace("_", " ")
+    true_strings = [v for s in expected_strings(fact, "true") for v in value_variants(s)]
+    rt = appears_any(value_variants(target_string), text)
+    rtrue = appears_any(true_strings, text)
+    return rt, rtrue, adoption_outcome(rt, rtrue)
+
+def prior_hits():
+    per_pair = {}
+    try:
+        with open(PROBE_RESULTS) as f:
+            for line in f:
+                r = json.loads(line)
+                if r["kind"] == "fact":
+                    per_pair.setdefault((r["model"], r["name"]), []).append(r["reports_expected"])
+    except FileNotFoundError:
+        pass
+    return ({k: any(v) for k, v in per_pair.items()},
+            {k: sum(v) > len(v) / 2 for k, v in per_pair.items()})
+
+def adoption_readout():
+    raw = []
+    for path, source in [(CAVEAT_RESULTS, "grid"), (OPUS_FI_PROBE_RESULTS, "opus_probe")]:
+        try:
+            with open(path) as f:
+                raw += [(json.loads(l), source) for l in f]
+        except FileNotFoundError:
+            print(f"  missing {path}, skipped")
+    any_hit, maj_hit = prior_hits()
+    out = []
+    for r, source in raw:
+        if r.get("truncated"):
+            continue
+        rt, rtrue, outcome = classify_adoption(r["answer"], FACT_BY_NAME[r["fact"]], r["target_string"])
+        pair = (r["model"], r["fact"])
+        out.append({"source": source, "model": r["model"], "instruction": r["instruction"],
+                    "document": r["document"], "fact": r["fact"], "severity": r["severity"],
+                    "rep": r.get("rep"), "run_id": r.get("run_id"), "stance": r["stance"],
+                    "answer_sha1": hashlib.sha1(r["answer"].encode()).hexdigest()[:12],
+                    "reports_target": rt, "reports_true": rtrue, "adoption": outcome,
+                    "prior_known_any": any_hit.get(pair), "prior_known_majority": maj_hit.get(pair),
+                    "silent_override": r["severity"] >= 1 and outcome == "true_only"
+                                       and r["stance"] not in (QUESTIONED, DECLINED)})
+    with open(ADOPTION_SIDECAR, "w") as f:
+        for o in out:
+            f.write(json.dumps(o) + "\n")
+    print(f"ADOPTION READOUT -- lexical, derived from saved answers; wrote {len(out)} rows to {ADOPTION_SIDECAR}")
+    s0 = [o for o in out if o["severity"] == 0]
+    answered_s0 = [o for o in s0 if o["stance"] not in (QUESTIONED, DECLINED)]
+    x, n, p = _rate(answered_s0, lambda o: o["adoption"] == "neither")
+    print(f"\nS0 CANARY -- matcher false-negative estimate on answered unperturbed rows: {x}/{n} = {p:.3f}")
+    per_fact = {}
+    for o in answered_s0:
+        if o["adoption"] == "neither":
+            per_fact[o["fact"]] = per_fact.get(o["fact"], 0) + 1
+    for fact, c in sorted(per_fact.items(), key=lambda kv: -kv[1]):
+        print(f"  {fact}: {c}")
+    pert = [o for o in out if o["severity"] >= 1]
+    print("\nADOPTION (S1-5) -- which value the answer contains")
+    print("  " + "model/instruction".ljust(48) + "  ".join(b.ljust(12) for b in ADOPTION_OUTCOMES) + "silent_override   n")
+    for m, i in sorted({(o["model"], o["instruction"]) for o in pert}):
+        rows = [o for o in pert if o["model"] == m and o["instruction"] == i]
+        rates = [f"{_rate(rows, lambda o, b=b: o['adoption'] == b)[2]:.2f}".ljust(12) for b in ADOPTION_OUTCOMES]
+        so_x, _, so_p = _rate(rows, lambda o: o["silent_override"])
+        print("  " + f"{m}/{i}".ljust(48) + "  ".join(rates) + f"{so_p:.2f} ({so_x})".ljust(18) + str(len(rows)))
+    so_counts = {}
+    for o in pert:
+        if o["silent_override"]:
+            k = (o["model"], o["instruction"], o["severity"])
+            so_counts[k] = so_counts.get(k, 0) + 1
+    if so_counts:
+        print("\nSILENT OVERRIDE cells (true value substituted, no question raised):")
+        for (m, i, s), c in sorted(so_counts.items()):
+            print(f"  {m}/{i} S{s}: {c}")
+        by_fact = {}
+        for o in pert:
+            if o["silent_override"]:
+                by_fact[o["fact"]] = by_fact.get(o["fact"], 0) + 1
+        print("\n  by fact (internal-anchor candidates marked):")
+        for fact, c in sorted(by_fact.items(), key=lambda kv: -kv[1]):
+            mark = "  [internally anchored]" if fact in INTERNALLY_ANCHORED_FACTS else ""
+            print(f"    {fact}: {c}{mark}")
+        n_anchor = sum(c for f, c in by_fact.items() if f in INTERNALLY_ANCHORED_FACTS)
+        print(f"  total {sum(by_fact.values())}, excluding internally anchored facts: {sum(by_fact.values()) - n_anchor}")
+    probed = [o for o in pert if o["prior_known_any"] is not None]
+    if probed:
+        print("\nPRIOR-CONDITIONED (S1-5 rows for models in the closed-book probe; probe N=3 per model x fact):")
+        for agg, field in [("any-rep", "prior_known_any"), ("majority", "prior_known_majority")]:
+            for status, val in [("prior known", True), ("prior absent", False)]:
+                rows = [o for o in probed if o[field] == val]
+                to_x, _, to_p = _rate(rows, lambda o: o["adoption"] == "true_only")
+                so_x, _, so_p = _rate(rows, lambda o: o["silent_override"])
+                print(f"  {agg:9} {status:13} n={len(rows):5}  true_only {to_p:.3f} ({to_x})  silent_override {so_p:.3f} ({so_x})")
+        pairs = {(o["model"], o["fact"]): o["prior_known_any"] for o in probed}
+        print(f"  prior-known pairs (any-rep): {sum(1 for v in pairs.values() if v)}/{len(pairs)}")
+
 # Test 2: Does a model invent an answer to something the document never addresses at all?
 
 ITEM_BY_ID = {p["item_id"]: p for p in UNANSWERABLE_ITEMS}
@@ -1358,7 +1514,7 @@ def _dprime_ci(counts, severity, iters=SDT_BOOTSTRAP_ITERS, seed=ANALYSIS_SEED):
     return draws[int(0.025 * len(draws))], draws[int(0.975 * len(draws))]
 
 def endorsement_sdt(cav, models):
-    print("\n--- EXPLORATORY (post-hoc, not pre-registered): endorsement propensity vs discrimination ---")
+    print("\n--- endorsement propensity vs discrimination ---")
     print(f"  rates corrected (x+0.5)/(n+1) before z; d'(s) = z(E|S0) - z(E|Ss); "
           f"[] = 95% cluster bootstrap over facts ({SDT_BOOTSTRAP_ITERS} resamples, fixed seed)")
     for m in models:
@@ -1437,7 +1593,7 @@ def _threshold_points(rows):
     return per_fact
 
 def detection_thresholds(cav, models):
-    print("\n--- EXPLORATORY (post-hoc, not pre-registered): detection threshold in ratio units ---")
+    print("\n--- detection threshold in ratio units ---")
     bounded = sorted(f["fact"] for f in PERTURBATION_LADDERS if all(s["ratio"] is None for s in f["steps"]))
     print(f"  logistic fit of questioned rate on log10(perturbation ratio), S0 (ratio 1) included as the false-alarm anchor;")
     print(f"  ratio50 = ratio at 50% flagging, reported only when the fitted curve crosses 0.5 inside the observed range;")
@@ -1498,6 +1654,13 @@ def build_manifest():
         "expected_cells": {"caveat": len(MODELS) * len(SYSTEM_INSTRUCTIONS) * total_steps(),
                            "abstention": len(MODELS) * len(SYSTEM_INSTRUCTIONS) * len(UNANSWERABLE_ITEMS),
                            "absence": len(MODELS) * len(SYSTEM_INSTRUCTIONS) * len(absence_facts)},
+        "probes": {"opus_fi": {"model": OPUS_PROBE_MODEL[0], "provider": OPUS_PROBE_MODEL[1],
+                               "instruction": "FLAG_INVITING", "n_per_cell": 1,
+                               "expected_rows": total_steps(), "results_file": OPUS_FI_PROBE_RESULTS,
+                               "anthropic_thinking": "adaptive, explicitly enabled",
+                               "candidate_params_otherwise": "match the grid",
+                               "run_date": "2026-07-17",
+                               "provenance": "probe ran after the grid manifest was generated; entry added 2026-07-17"}},
         "perturbation_ladders": PERTURBATION_LADDERS,
         "unanswerable_items": UNANSWERABLE_ITEMS,
     }))
@@ -1570,6 +1733,8 @@ if __name__ == "__main__": # only run file if executed directly
             rescore_caveat(args[1:] or None)
     elif args and args[0] == "endorsement":
         endorsement_breakdown()
+    elif args and args[0] == "adoption":
+        adoption_readout()
     elif args and args[0] == "manifest":
         write_manifest()
     elif args and args[0] == "matched":
@@ -1582,7 +1747,7 @@ if __name__ == "__main__": # only run file if executed directly
             sys.exit(1)
         run_pilot(args[1], args[2], int(args[3]) if len(args) > 3 else N_PER_CELL)
     elif args and not args[0].isdigit():
-        print("usage: python3 harness.py [N] | caveat [N] | abstention [N] | absence [N] | probe [N] | rescore | endorsement | vectors | matched | analysis | manifest | pilot <model> <doc> [N]")
+        print("usage: python3 harness.py [N] | caveat [N] | abstention [N] | absence [N] | probe [N] | rescore | endorsement | adoption | vectors | matched | analysis | manifest | pilot <model> <doc> [N]")
         sys.exit(1)
     else:
         n = int(args[0]) if args else N_PER_CELL
