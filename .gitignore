@@ -2,7 +2,6 @@
 .env.local
 __pycache__/
 *.pyc
-archive/
 abstention_judge_results.json
 caveat_judge_results.json
 discriminate_results.jsonl

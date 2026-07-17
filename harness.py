@@ -402,9 +402,12 @@ def validate_ladders(): # validates the perturbation ladder
                     problems.append(f"{fact['fact']} S0: control target string '{s['target_string']}' not found in the document")
             else:
                 try:
-                    perturb(base, s["replace"])
+                    pdoc = perturb(base, s["replace"])
                 except AssertionError as e: # append assertion error for perturbing to problems list
                     problems.append(f"{fact['fact']} S{s['severity']}: {e}")
+                else:
+                    if not appears(s["target_string"], pdoc):
+                        problems.append(f"{fact['fact']} S{s['severity']}: target string '{s['target_string']}' not found in the perturbed document")
     return problems
 
 def print_caveat_plan(n): # a preview for what running the harness will do to diagnose errors before using API credits
@@ -427,7 +430,7 @@ def print_caveat_plan(n): # a preview for what running the harness will do to di
         for p in problems:
             print(f"    - {p}") # print the problems
         return False
-    print(f"\n  ladder validation: {total_steps() - len(PERTURBATION_LADDERS)} perturbations applied + {len(PERTURBATION_LADDERS)} control target strings verified in the document")
+    print(f"\n  ladder validation: {total_steps() - len(PERTURBATION_LADDERS)} perturbations applied + {total_steps()} target strings verified in their step documents")
     return True
 
 def load_done(path, fields): 

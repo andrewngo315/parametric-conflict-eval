@@ -1,5 +1,6 @@
 import anthropic
 import json
+import openai
 import os
 import re
 import time
@@ -22,7 +23,7 @@ DOCUMENTS = {
     "liquor": "documents/document3_liquor.txt",
 }
 _here = os.path.dirname(os.path.abspath(__file__))
-DOCUMENT_TEXTS = {name: open(os.path.join(_here, fname)).read() for name, fname in DOCUMENTS.items()}
+DOCUMENT_TEXTS = {name: open(os.path.join(_here, fname), encoding="utf-8").read() for name, fname in DOCUMENTS.items()}
 
 def doc_text(ref):
     return DOCUMENT_TEXTS[ref]
@@ -99,11 +100,13 @@ def call_closed_book(model, provider, system, question):
         print(f"    WARNING: answer truncated at max_output_tokens ({model})", flush=True)
     return r.output_text or "", r.model, truncated
 
+RETRYABLE_ERRORS = (anthropic.AnthropicError, openai.OpenAIError)
+
 def with_retry(fn, *args, attempts=8):
     for i in range(attempts):
         try:
             return fn(*args) # calls the function and returns if it succeeds
-        except Exception as e: # if error is raised, store in variable e
+        except RETRYABLE_ERRORS as e: # if error is raised, store in variable e
             if i == attempts - 1:
                 raise # raise the error if the last attempt is reached
             wait = 2 ** i
@@ -135,7 +138,7 @@ def perturb(document, replacements): # Builds the perturbed document
     return pdoc
 
 def appears(phrase, text):
-    return re.search(r"\b" + re.escape(phrase) + r"\b", text, re.IGNORECASE) is not None # Returns true if phrase is present as a whole word ignoring capitalisation in model's answer, false if not
+    return re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", text, re.IGNORECASE) is not None # Returns true if phrase is present as a whole word ignoring capitalisation in model's answer, false if not
 
 def step_doc(fact, step): # perturbs the fact's document based on the step
     base = doc_text(fact["doc"])

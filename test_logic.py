@@ -1,6 +1,7 @@
 # Tests to verify the functions are working as intended. No API key required.
 import json
 import math
+import openai
 import os
 import tempfile
 import types
@@ -273,6 +274,15 @@ class TestLadders(unittest.TestCase):
             problems = validate_ladders()
         self.assertTrue(any("no change in passage detected" in p for p in problems))
         self.assertEqual(len(problems), total_steps() - len(PERTURBATION_LADDERS))
+
+    def test_perturbed_step_target_string_absent_fails_validation(self):
+        bad = [{"fact": "grasses", "doc": "consent", "true": "10cm", "q": "?", "steps": [
+            {"severity": 0, "replace": [], "target_string": "10cm", "ratio": 1},
+            {"severity": 1, "replace": [("exceed 10cm in height", "exceed 15cm in height")],
+             "target_string": "zzqx", "ratio": 1.5}]}]
+        with mock.patch("harness.PERTURBATION_LADDERS", bad):
+            problems = validate_ladders()
+        self.assertTrue(any("not found in the perturbed document" in p for p in problems))
 
 
 class TestControlRung(unittest.TestCase):
@@ -613,21 +623,34 @@ class TestWithRetry(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
     def test_raises_after_exhausting_attempts(self):
+        state = {"n": 0}
         def fn():
-            raise ValueError("boom")
-        with self.assertRaises(ValueError):
-            with_retry(fn, attempts=1)
+            state["n"] += 1
+            raise openai.OpenAIError("boom")
+        with mock.patch("config.time.sleep"):
+            with self.assertRaises(openai.OpenAIError):
+                with_retry(fn, attempts=3)
+        self.assertEqual(state["n"], 3)
 
     def test_retries_then_succeeds(self):
         state = {"n": 0}
         def fn():
             state["n"] += 1
             if state["n"] < 3:
-                raise RuntimeError("transient")
+                raise openai.OpenAIError("transient")
             return "ok"
         with mock.patch("config.time.sleep"):
             self.assertEqual(with_retry(fn, attempts=5), "ok")
         self.assertEqual(state["n"], 3)
+
+    def test_non_provider_error_surfaces_immediately(self):
+        state = {"n": 0}
+        def fn():
+            state["n"] += 1
+            raise TypeError("bug")
+        with self.assertRaises(TypeError):
+            with_retry(fn, attempts=8)
+        self.assertEqual(state["n"], 1)
 
 
 class TestEffortConvention(unittest.TestCase):
@@ -684,6 +707,14 @@ class TestAppears(unittest.TestCase):
 
     def test_case_insensitive(self):
         self.assertTrue(appears("not in document", "NOT IN DOCUMENT"))
+
+    def test_symbol_edged_phrases_match(self):
+        self.assertTrue(appears("$1,800", "a contribution of $1,800.00 is made"))
+        self.assertTrue(appears("4.5%", "a levy of 4.5% applies"))
+
+    def test_symbol_edged_phrase_no_substring_match(self):
+        self.assertFalse(appears("$1,800", "a contribution of $1,8001 is made"))
+        self.assertFalse(appears("1,800", "a contribution of 91,800 is made"))
 
 
 class TestLegacyGoldGuard(unittest.TestCase):

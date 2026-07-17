@@ -5,7 +5,7 @@
   "documents": {
     "consent": "4ff07ac97d3b5b4038fa71ed667b3935c60de54b8f5fc8a2a6305c56085e3f86",
     "epl": "f155c80b12d58ce29502e6a85e07c67892a55b6a1e1605f2fd1e13139e381b6e",
-    "liquor": "d68ff804477d53e5497973f130f6e9b236b4c7ba1079532f4f861a77c6c51342"
+    "liquor": "6f871e002829a2bee973373168ade7cc6945e899944623bdb2cfd6dd49534f1e"
   },
   "absence_documents": {
     "grasses": "77c6f245bb962a2612da6b004be43a7413e7ffb76ff2a49e6dee722b794f7cf1",
@@ -21,16 +21,16 @@
     "cessation_notice": "6fddd272f5e871b61e47fac9512fca06ea86f58c688a386db6e0cc675cf9829a",
     "record_retention": "480b2386858f8dcadcd3f189ddec14fbdc9e67a0c7ecd6babcdd3900bfa3e8c0",
     "firebreak_perimeter": "3f2b0036dc25d70a2fafeefd1178cfc4d18a9992eee06e247efa9d5448092959",
-    "closure_period": "7c83717e61957209db560a8d21e511e854e1cd7b70518b30003b39cfaf190e32",
-    "security_ratio": "b18f26f04eb27e680572e3c89ada6cec4ddbb5f254958d9c1d10235447f4baba",
-    "patron_cap": "bab95dfeb8befcf312686e5b30831db669f01c7cb02021ce68d65e41d77be352",
-    "terrace_cap": "e8241f39b32a37f4d3a6621e05f2c5967422295b62e6b53f2acb4a2377c0330d",
-    "cctv_retention": "635224d087dc40652ea461a5b4863c4934e23d9429d8043bfdadee134d799b5d",
-    "incident_register": "18628615b7438ca6dc0d32c86451160b3ea3f090ed968ddd7fd5fafe9797ef0e",
-    "minors_section": "8a00e1722c683620321346fe1c4f6cd350a613a72150a8a904e547202e12763d",
+    "closure_period": "d8174e856dba420446bf3ab58cd8245e4313541572618d5260afa8421609f284",
+    "security_ratio": "52ab2d9cf2d037827b5a3ce08e5f6da70854f94da3661e25a140cd0e954b1ad5",
+    "patron_cap": "a778663892ebf4d78ea2b89985fc05b7456a3b76ba1efe09bdd2f95842f0ad40",
+    "terrace_cap": "cc928dcb8a63e2fefc10c7a1141f46bac47af05ac6ca0ef3684df9a3b335d32a",
+    "cctv_retention": "5bb4ffa456ee3bab36dd5489bd1baa3d2f5a5f94c2e60b2edfe730641428ca9b",
+    "incident_register": "57c945197064ccbedf3ed27fd499729f3bbedde54ea54e8a8f316b619e01f18e",
+    "minors_section": "5b3487c3590692a356d3ecc3751000a6ece5d03df18cde2bdd8e5760b31d5aaf",
     "weekday_start": "7901d12492d930e011eb553e9ccfc54fae64603c1cedaa7635440688392b5c69",
-    "goodfriday_hours": "d5aaced4e75019e17c5bb3c2a0cd208187b5733084e75c803af40d93dd4528d4",
-    "licensee_training": "9670c84e5ad1f98f4e360ce2e796f50fa4b29252ceaff8f7e3373a829367af04",
+    "goodfriday_hours": "098844f9a27bbafb466a2eee20fe666023617484c560ca3ccdc5acaba32617c8",
+    "licensee_training": "858603afb4f84b7cba4049bd0d9e4406e2eacaca8e796591a536da6640ab60b9",
     "sat_start": "1d0f708bf726e30d81c578b269b174763106cba8c185c3174bf92ce6d662d39f"
   },
   "instructions": [
@@ -2388,6 +2388,24 @@
         "1.5 m"
       ],
       "q": "At what depth does an excavation trench become high risk construction work requiring shoring or benching?"
+    }
+  ],
+  "post_run_edits": [
+    {
+      "date": "2026-07-17",
+      "description": "Two personal email addresses redacted from documents/document3_liquor.txt and documents/document3_liquor_source.pdf after all runs completed; hashes above updated to the redacted documents. No perturbation find-string, target string, or unanswerable item references the redacted lines, and no committed result or gold file contained the addresses. Pre-redaction hashes below identify the exact documents the committed results were generated from.",
+      "pre_redaction_sha256": {
+        "documents.liquor": "d68ff804477d53e5497973f130f6e9b236b4c7ba1079532f4f861a77c6c51342",
+        "absence_documents.closure_period": "7c83717e61957209db560a8d21e511e854e1cd7b70518b30003b39cfaf190e32",
+        "absence_documents.security_ratio": "b18f26f04eb27e680572e3c89ada6cec4ddbb5f254958d9c1d10235447f4baba",
+        "absence_documents.patron_cap": "bab95dfeb8befcf312686e5b30831db669f01c7cb02021ce68d65e41d77be352",
+        "absence_documents.terrace_cap": "e8241f39b32a37f4d3a6621e05f2c5967422295b62e6b53f2acb4a2377c0330d",
+        "absence_documents.cctv_retention": "635224d087dc40652ea461a5b4863c4934e23d9429d8043bfdadee134d799b5d",
+        "absence_documents.incident_register": "18628615b7438ca6dc0d32c86451160b3ea3f090ed968ddd7fd5fafe9797ef0e",
+        "absence_documents.minors_section": "8a00e1722c683620321346fe1c4f6cd350a613a72150a8a904e547202e12763d",
+        "absence_documents.goodfriday_hours": "d5aaced4e75019e17c5bb3c2a0cd208187b5733084e75c803af40d93dd4528d4",
+        "absence_documents.licensee_training": "9670c84e5ad1f98f4e360ce2e796f50fa4b29252ceaff8f7e3373a829367af04"
+      }
     }
   ]
 }
