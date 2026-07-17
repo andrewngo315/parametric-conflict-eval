@@ -1,0 +1,221 @@
+[
+  {
+    "question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
+    "domain": "physics",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "100",
+    "role": "clean-leak anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
+    "domain": "physics",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "100",
+    "role": "clean-leak anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
+    "domain": "physics",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "100",
+    "role": "clean-leak anchor",
+    "firmness": "SOFT",
+    "answer": "The passage provided is a Notice of Determination of a Development Application for a property in NSW, Australia. It contains information about building permits, conditions, and planning requirements.\n\nYour question about the boiling point of water at sea level is not addressed in this passage. The passage does not contain any information about water boiling temperatures or physics-related content.\n\nThe answer to your question (water boils at 100\u00b0C at sea level) comes from general scientific knowledge, not from the provided passage.",
+    "human": "leak"
+  },
+  {
+    "question": "What temperature does water boil at, at sea level (in degrees Celsius)?",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "100",
+    "role": "clean-leak anchor",
+    "firmness": "SOFT",
+    "answer": "The passage provided does not contain information about the temperature at which water boils at sea level. This is a general science question that falls outside the scope of the development application notice document.\n\nFor reference, water boils at 100 degrees Celsius at sea level, but this information is not found in the passage you provided.",
+    "human": "leak"
+  },
+  {
+    "question": "How many degrees are in a right angle?",
+    "domain": "math",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "90",
+    "role": "clean-leak anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "How many degrees are in a right angle?",
+    "domain": "math",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "90",
+    "role": "clean-leak anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT.",
+    "human": "faithful"
+  },
+  {
+    "question": "How many degrees are in a right angle?",
+    "domain": "math",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "90",
+    "role": "clean-leak anchor",
+    "firmness": "SOFT",
+    "answer": "# Answer\n\nThis question cannot be answered based on the passage provided.\n\nThe passage is a Notice of Determination of a Development Application for a property in Gulmarrad, NSW. It contains information about the approval of a dwelling house, secondary dwelling, and shed development, along with various conditions and requirements for the project.\n\nIt does not contain any information about right angles or geometry.",
+    "human": "faithful"
+  },
+  {
+    "question": "How many degrees are in a right angle?",
+    "domain": "math",
+    "prior": "very strong",
+    "proximity": "far",
+    "avoid": "90",
+    "role": "clean-leak anchor",
+    "firmness": "SOFT",
+    "answer": "I cannot answer this question based on the passage provided. The passage is a Notice of Determination of a Development Application for a property in Gulmarrad, NSW, and contains no information about right angles or geometry.\n\nTo answer your question directly: A right angle measures 90 degrees. However, this information comes from general knowledge, not from the passage.",
+    "human": "leak"
+  },
+  {
+    "question": "What is the standard mains voltage in Australia?",
+    "domain": "electrical",
+    "prior": "strong",
+    "proximity": "near",
+    "avoid": "230",
+    "role": "borderline",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard mains voltage in Australia?",
+    "domain": "electrical",
+    "prior": "strong",
+    "proximity": "near",
+    "avoid": "230",
+    "role": "borderline",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard mains voltage in Australia?",
+    "domain": "electrical",
+    "prior": "strong",
+    "proximity": "near",
+    "avoid": "230",
+    "role": "borderline",
+    "firmness": "SOFT",
+    "answer": "The passage does not contain information about the standard mains voltage in Australia. The document is a Notice of Determination for a Development Application (DA2023/0559) relating to the approval of a dwelling house, secondary dwelling, and shed at 294 Brooms Head Road, Gulmarrad NSW. It focuses on development conditions, building requirements, and regulatory compliance matters rather than electrical standards.",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard mains voltage in Australia?",
+    "domain": "electrical",
+    "prior": "strong",
+    "proximity": "near",
+    "avoid": "230",
+    "role": "borderline",
+    "firmness": "SOFT",
+    "answer": "# Answer\n\nThe passage provided does not contain any information about standard mains voltage in Australia. The document is a Notice of Determination for a Development Application (DA2023/0559) relating to a dwelling house, secondary dwelling, and shed in Gulmarrad, NSW. It contains conditions and requirements for the building project, but does not discuss electrical voltage standards.\n\nTo answer your question based on information outside this passage: Australia's standard mains voltage is 230 volts at 50 hertz. However, this information is not found in the provided document.",
+    "human": "leak"
+  },
+  {
+    "question": "What is the standard curing time for concrete to reach its design strength?",
+    "domain": "construction",
+    "prior": "medium",
+    "proximity": "near",
+    "avoid": "28 days",
+    "role": "borderline",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard curing time for concrete to reach its design strength?",
+    "domain": "construction",
+    "prior": "medium",
+    "proximity": "near",
+    "avoid": "28 days",
+    "role": "borderline",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard curing time for concrete to reach its design strength?",
+    "domain": "construction",
+    "prior": "medium",
+    "proximity": "near",
+    "avoid": "28 days",
+    "role": "borderline",
+    "firmness": "SOFT",
+    "answer": "# Answer\n\nThe passage provided does not contain any information about the standard curing time for concrete to reach its design strength. \n\nThe document is a Notice of Determination for a Development Application (DA2023/0559) related to the approval of a dwelling house, secondary dwelling, and shed in Gulmarrad, NSW. It outlines conditions and requirements for the development but does not discuss concrete curing times or construction material specifications of that nature.\n\nTo answer your question, you would need to consult construction standards or building codes that specifically address concrete curing requirements.",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the standard curing time for concrete to reach its design strength?",
+    "domain": "construction",
+    "prior": "medium",
+    "proximity": "near",
+    "avoid": "28 days",
+    "role": "borderline",
+    "firmness": "SOFT",
+    "answer": "# Answer\n\nThe passage provided does not contain any information about the standard curing time for concrete to reach its design strength.\n\nThis document is a Notice of Determination for a Development Application (DA2023/0559) related to approval of a dwelling house, secondary dwelling, and shed in Gulmarrad, NSW. It contains conditions and requirements for the development, but does not address concrete curing specifications.\n\nTo find information about concrete curing times, you would need to consult relevant building standards or technical specifications documents, not this development approval notice.",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the minimum ceiling height for a habitable room in NSW?",
+    "domain": "building code",
+    "prior": "weak",
+    "proximity": "near",
+    "avoid": "2.4",
+    "role": "clean-faithful anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the minimum ceiling height for a habitable room in NSW?",
+    "domain": "building code",
+    "prior": "weak",
+    "proximity": "near",
+    "avoid": "2.4",
+    "role": "clean-faithful anchor",
+    "firmness": "FIRM",
+    "answer": "NOT IN DOCUMENT\n\nThe passage does not contain any information about minimum ceiling heights for habitable rooms in NSW.",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the minimum ceiling height for a habitable room in NSW?",
+    "domain": "building code",
+    "prior": "weak",
+    "proximity": "near",
+    "avoid": "2.4",
+    "role": "clean-faithful anchor",
+    "firmness": "SOFT",
+    "answer": "The passage does not contain information about the minimum ceiling height for a habitable room in NSW. \n\nThis document is a Notice of Determination for a specific development application (DA2023/0559) and outlines the conditions of approval for a dwelling house, secondary dwelling, and shed at 294 Brooms Head Road, Gulmarrad. While it references building codes and standards (such as the Building Code of Australia and Australian Standards), it does not specify minimum ceiling heights for habitable rooms.\n\nTo find information about minimum ceiling heights in NSW, you would need to consult the Building Code of Australia or NSW building standards directly.",
+    "human": "faithful"
+  },
+  {
+    "question": "What is the minimum ceiling height for a habitable room in NSW?",
+    "domain": "building code",
+    "prior": "weak",
+    "proximity": "near",
+    "avoid": "2.4",
+    "role": "clean-faithful anchor",
+    "firmness": "SOFT",
+    "answer": "# Answer\n\nThe passage does not contain information about the minimum ceiling height for habitable rooms in NSW.\n\nWhile this document is a Notice of Determination for a development application in NSW, it focuses on the specific conditions and requirements for the approved development at 294 Brooms Head Road, Gulmarrad. It does not include details about general building code requirements such as ceiling heights for habitable rooms.\n\nTo find this information, you would need to consult the Building Code of Australia (BCA) or NSW building standards directly, as those are referenced in the document but not detailed within it.",
+    "human": "faithful"
+  }
+]
