@@ -238,7 +238,7 @@ All effects are computed per fact and averaged. [] is a 95% bootstrap interval o
 
 - Both instruction sets increased faithfulness rates in comparison to WG (with the exception of the Anthropic models on flag-invitation main), but source exclusivity instructions were much more effective than flag invitation ones across the models. 
 - On the OpenAI models, the interaction between the two instructions worsened the faithfulness rates, while the opposite effect was observed in Sonnet 5. 
-- Between absence faithfulness and error flagging, OpenAI models appeared to have worsened performance in handling document-grounded QA under the interaction between the mains as opposed to the Anthropic models, suggesting that the Anthropic models tested are more capable of interpreting more complex system instructions than the OpenAI models tested.
+- Between absence faithfulness and error flagging, OpenAI models appeared to have worsened performance in handling document-grounded QA under the interaction between the mains as opposed to the Anthropic models. One reading is that the tested Anthropic models interpret complex system instructions more capably, but this design cannot separate whether that reflects how each model provider trains its models to follow instructions, or the answer style or comprehension systems of the models. 
 
 **False endorsement**
 
